@@ -1,0 +1,46 @@
+spring:
+  application:
+    name: sme-onboarding-service
+
+server:
+  port: 8090
+
+camunda:
+  client:
+    mode: self-managed
+    grpc-address: http://localhost:26500
+    rest-address: http://localhost:8080
+
+kilima:
+  core-banking:
+    base-url: http://localhost:8090/stub/core-banking
+    connect-timeout: 2s
+    read-timeout: 10s
+    calls-per-minute: 18
+    max-retries: 10
+    maintenance-window:
+      zone: Africa/Nairobi
+      start: "00:00"
+      end: "02:00"
+  registry:
+    base-url: http://localhost:8090/stub/registry
+    connect-timeout: 1s
+    read-timeout: 3s
+  screening:
+    base-url: http://localhost:8090/stub/screening
+    callback-url: http://localhost:8090/api/screening/callback
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,metrics,prometheus
+
+---
+spring:
+  config:
+    activate:
+      on-profile: stub
+stub:
+  screening:
+    callback-delay: 10s
