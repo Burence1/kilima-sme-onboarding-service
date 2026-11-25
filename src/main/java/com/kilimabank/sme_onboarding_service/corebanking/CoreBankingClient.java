@@ -35,9 +35,7 @@ public class CoreBankingClient {
   }
 
   public Optional<Customer> findCustomer(String registrationNumber) {
-    return send(
-        "GET /customers",
-        true,
+    return send("GET /customers", true,
         () ->
             restClient
                 .get()
