@@ -1,0 +1,65 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<definitions xmlns="https://www.omg.org/spec/DMN/20191111/MODEL/"
+             xmlns:dmndi="https://www.omg.org/spec/DMN/20191111/DMNDI/"
+             xmlns:dc="http://www.omg.org/spec/DMN/20180521/DC/"
+             xmlns:modeler="http://camunda.org/schema/modeler/1.0"
+             id="Definitions_DueDiligence" name="Due diligence level"
+             namespace="http://kilimabank.example/dmn"
+             exporter="Camunda Modeler" exporterVersion="5.40.0"
+             modeler:executionPlatform="Camunda Cloud" modeler:executionPlatformVersion="8.9.0">
+  <decision id="due-diligence-level" name="Due diligence level">
+    <decisionTable id="DecisionTable_DueDiligence" hitPolicy="FIRST">
+      <input id="Input_ScreeningMatch" label="Screening match">
+        <inputExpression id="InputExpression_ScreeningMatch" typeRef="boolean">
+          <text>screeningMatch</text>
+        </inputExpression>
+      </input>
+      <input id="Input_LegalForm" label="Legal form">
+        <inputExpression id="InputExpression_LegalForm" typeRef="string">
+          <text>legalForm</text>
+        </inputExpression>
+      </input>
+      <input id="Input_Country" label="Country">
+        <inputExpression id="InputExpression_Country" typeRef="string">
+          <text>country</text>
+        </inputExpression>
+      </input>
+      <output id="Output_Level" label="Due diligence level" name="dueDiligenceLevel" typeRef="string" />
+      <rule id="Rule_Match">
+        <description>Any sanctions or PEP match goes to compliance review</description>
+        <inputEntry id="UnaryTests_Match_1"><text>true</text></inputEntry>
+        <inputEntry id="UnaryTests_Match_2"><text></text></inputEntry>
+        <inputEntry id="UnaryTests_Match_3"><text></text></inputEntry>
+        <outputEntry id="LiteralExpression_Match"><text>"enhanced"</text></outputEntry>
+      </rule>
+      <rule id="Rule_HighRiskForm">
+        <description>Higher-risk legal forms</description>
+        <inputEntry id="UnaryTests_Form_1"><text></text></inputEntry>
+        <inputEntry id="UnaryTests_Form_2"><text>"TRUST","NGO"</text></inputEntry>
+        <inputEntry id="UnaryTests_Form_3"><text></text></inputEntry>
+        <outputEntry id="LiteralExpression_Form"><text>"enhanced"</text></outputEntry>
+      </rule>
+      <rule id="Rule_SoleProprietorKE">
+        <description>Kenyan sole proprietor verified against the registry API</description>
+        <inputEntry id="UnaryTests_Sole_1"><text></text></inputEntry>
+        <inputEntry id="UnaryTests_Sole_2"><text>"SOLE_PROPRIETOR"</text></inputEntry>
+        <inputEntry id="UnaryTests_Sole_3"><text>"KE"</text></inputEntry>
+        <outputEntry id="LiteralExpression_Sole"><text>"simplified"</text></outputEntry>
+      </rule>
+      <rule id="Rule_Default">
+        <description>Everything else</description>
+        <inputEntry id="UnaryTests_Default_1"><text></text></inputEntry>
+        <inputEntry id="UnaryTests_Default_2"><text></text></inputEntry>
+        <inputEntry id="UnaryTests_Default_3"><text></text></inputEntry>
+        <outputEntry id="LiteralExpression_Default"><text>"standard"</text></outputEntry>
+      </rule>
+    </decisionTable>
+  </decision>
+  <dmndi:DMNDI>
+    <dmndi:DMNDiagram id="DMNDiagram_DueDiligence">
+      <dmndi:DMNShape id="DMNShape_DueDiligence" dmnElementRef="due-diligence-level">
+        <dc:Bounds height="80" width="180" x="160" y="100" />
+      </dmndi:DMNShape>
+    </dmndi:DMNDiagram>
+  </dmndi:DMNDI>
+</definitions>
