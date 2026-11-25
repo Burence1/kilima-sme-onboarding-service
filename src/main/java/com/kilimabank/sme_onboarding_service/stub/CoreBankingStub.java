@@ -89,6 +89,7 @@ public class CoreBankingStub {
     return ResponseEntity.status(201).body(Map.of("accountNumber", accountNumber));
   }
 
+
   private synchronized ResponseEntity<?> refuseIfUnavailable() {
     LocalTime eat = ZonedDateTime.now(ZoneId.of("Africa/Nairobi")).toLocalTime();
     if (forceMaintenance || eat.isBefore(LocalTime.of(2, 0))) {
