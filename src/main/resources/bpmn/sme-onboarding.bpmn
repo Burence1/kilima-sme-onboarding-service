@@ -1,631 +1,500 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<bpmn:definitions xmlns:bpmn="http://www.omg.org/spec/BPMN/20100524/MODEL" xmlns:bpmndi="http://www.omg.org/spec/BPMN/20100524/DI" xmlns:dc="http://www.omg.org/spec/DD/20100524/DC" xmlns:zeebe="http://camunda.org/schema/zeebe/1.0" xmlns:di="http://www.omg.org/spec/DD/20100524/DI" xmlns:modeler="http://camunda.org/schema/modeler/1.0" id="Definitions_1cm6lu0" targetNamespace="http://bpmn.io/schema/bpmn" exporter="Camunda Modeler" exporterVersion="5.53.0" modeler:executionPlatform="Camunda Cloud" modeler:executionPlatformVersion="8.10.0">
-  <bpmn:process id="Process_04kln1i" isExecutable="true">
-    <bpmn:startEvent id="StartEvent_1" name="Application Started">
-      <bpmn:outgoing>Flow_1aveltz</bpmn:outgoing>
+<bpmn:definitions xmlns:bpmn="http://www.omg.org/spec/BPMN/20100524/MODEL"
+                  xmlns:bpmndi="http://www.omg.org/spec/BPMN/20100524/DI"
+                  xmlns:dc="http://www.omg.org/spec/DD/20100524/DC"
+                  xmlns:di="http://www.omg.org/spec/DD/20100524/DI"
+                  xmlns:zeebe="http://camunda.org/schema/zeebe/1.0"
+                  xmlns:modeler="http://camunda.org/schema/modeler/1.0"
+                  id="Definitions_SmeOnboarding"
+                  targetNamespace="http://kilimabank.example/bpmn"
+                  exporter="Camunda Modeler" exporterVersion="5.40.0"
+                  modeler:executionPlatform="Camunda Cloud"
+                  modeler:executionPlatformVersion="8.9.0">
+
+  <bpmn:process id="sme-onboarding" name="SME account onboarding" isExecutable="true">
+    <bpmn:extensionElements>
+      <zeebe:versionTag value="1.0.0" />
+    </bpmn:extensionElements>
+
+    <bpmn:startEvent id="StartEvent_ApplicationSubmitted" name="Application submitted">
+      <bpmn:outgoing>Flow_ToCountry</bpmn:outgoing>
+      <bpmn:messageEventDefinition id="MessageEventDefinition_ApplicationSubmitted" messageRef="Message_ApplicationSubmitted" />
     </bpmn:startEvent>
-    <bpmn:exclusiveGateway id="Gateway_0si44z1" name="Country?" default="Flow_06blbgp">
-      <bpmn:incoming>Flow_1aveltz</bpmn:incoming>
-      <bpmn:outgoing>Flow_0l7ypxv</bpmn:outgoing>
-      <bpmn:outgoing>Flow_06blbgp</bpmn:outgoing>
+    <bpmn:sequenceFlow id="Flow_ToCountry" sourceRef="StartEvent_ApplicationSubmitted" targetRef="Gateway_Country" />
+
+    <bpmn:exclusiveGateway id="Gateway_Country" name="Country?" default="Flow_Country_Other">
+      <bpmn:incoming>Flow_ToCountry</bpmn:incoming>
+      <bpmn:outgoing>Flow_Country_KE</bpmn:outgoing>
+      <bpmn:outgoing>Flow_Country_Other</bpmn:outgoing>
     </bpmn:exclusiveGateway>
-    <bpmn:sequenceFlow id="Flow_1aveltz" sourceRef="StartEvent_1" targetRef="Gateway_0si44z1" />
-    <bpmn:serviceTask id="Activity_13we8ub" name="query business registry">
-      <bpmn:incoming>Flow_0l7ypxv</bpmn:incoming>
-      <bpmn:outgoing>Flow_1984nvi</bpmn:outgoing>
+    <bpmn:sequenceFlow id="Flow_Country_KE" name="Kenya" sourceRef="Gateway_Country" targetRef="Task_RegistryLookup">
+      <bpmn:conditionExpression xsi:type="bpmn:tFormalExpression" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">=country = "KE"</bpmn:conditionExpression>
+    </bpmn:sequenceFlow>
+    <bpmn:sequenceFlow id="Flow_Country_Other" name="Tanzania / Uganda" sourceRef="Gateway_Country" targetRef="Gateway_JoinManualCheck" />
+
+    <bpmn:serviceTask id="Task_RegistryLookup" name="Look up business registry">
+      <bpmn:extensionElements>
+        <zeebe:taskDefinition type="registry-lookup" retries="5" />
+        <zeebe:ioMapping>
+          <zeebe:input source="=registrationNumber" target="registrationNumber" />
+          <zeebe:output source="=registryVerified" target="registryVerified" />
+          <zeebe:output source="=registryStatus" target="registryStatus" />
+        </zeebe:ioMapping>
+      </bpmn:extensionElements>
+      <bpmn:incoming>Flow_Country_KE</bpmn:incoming>
+      <bpmn:outgoing>Flow_RegistryLookupDone</bpmn:outgoing>
     </bpmn:serviceTask>
-    <bpmn:sequenceFlow id="Flow_0l7ypxv" name="Kenya" sourceRef="Gateway_0si44z1" targetRef="Activity_13we8ub" />
-    <bpmn:userTask id="Activity_0l3rhgl" name="check registry manually">
+    <bpmn:boundaryEvent id="Boundary_RegistryNotFound" name="Not found in registry" attachedToRef="Task_RegistryLookup">
+      <bpmn:outgoing>Flow_NotFoundToManual</bpmn:outgoing>
+      <bpmn:errorEventDefinition errorRef="Error_RegistryNotFound" />
+    </bpmn:boundaryEvent>
+    <bpmn:sequenceFlow id="Flow_NotFoundToManual" sourceRef="Boundary_RegistryNotFound" targetRef="Gateway_JoinManualCheck" />
+    <bpmn:exclusiveGateway id="Gateway_JoinManualCheck">
+      <bpmn:incoming>Flow_Country_Other</bpmn:incoming>
+      <bpmn:incoming>Flow_NotFoundToManual</bpmn:incoming>
+      <bpmn:outgoing>Flow_ToManualCheck</bpmn:outgoing>
+    </bpmn:exclusiveGateway>
+    <bpmn:sequenceFlow id="Flow_ToManualCheck" sourceRef="Gateway_JoinManualCheck" targetRef="Task_ManualRegistryCheck" />
+
+    <bpmn:userTask id="Task_ManualRegistryCheck" name="Check registry manually">
       <bpmn:extensionElements>
         <zeebe:userTask />
+        <zeebe:formDefinition formId="manual-registry-check" />
+        <zeebe:assignmentDefinition candidateGroups="=[&#34;branch-ops-&#34; + lower case(country)]" />
+        <zeebe:ioMapping>
+          <zeebe:input source="=registrationNumber" target="registrationNumber" />
+          <zeebe:input source="=businessName" target="businessName" />
+          <zeebe:output source="=registryVerified" target="registryVerified" />
+        </zeebe:ioMapping>
       </bpmn:extensionElements>
-      <bpmn:incoming>Flow_1g7lzbc</bpmn:incoming>
-      <bpmn:outgoing>Flow_1s3dmbp</bpmn:outgoing>
+      <bpmn:incoming>Flow_ToManualCheck</bpmn:incoming>
+      <bpmn:outgoing>Flow_ManualCheckDone</bpmn:outgoing>
     </bpmn:userTask>
-    <bpmn:sequenceFlow id="Flow_06blbgp" name="Tanzania/Uganda" sourceRef="Gateway_0si44z1" targetRef="Gateway_1ukyzed" />
-    <bpmn:exclusiveGateway id="Gateway_1ukyzed">
-      <bpmn:incoming>Flow_06blbgp</bpmn:incoming>
-      <bpmn:incoming>Flow_1e4ljdw</bpmn:incoming>
-      <bpmn:outgoing>Flow_1g7lzbc</bpmn:outgoing>
+
+    <bpmn:sequenceFlow id="Flow_RegistryLookupDone" sourceRef="Task_RegistryLookup" targetRef="Gateway_JoinRegistry" />
+    <bpmn:sequenceFlow id="Flow_ManualCheckDone" sourceRef="Task_ManualRegistryCheck" targetRef="Gateway_JoinRegistry" />
+    <bpmn:exclusiveGateway id="Gateway_JoinRegistry">
+      <bpmn:incoming>Flow_RegistryLookupDone</bpmn:incoming>
+      <bpmn:incoming>Flow_ManualCheckDone</bpmn:incoming>
+      <bpmn:outgoing>Flow_ToRegistryDecision</bpmn:outgoing>
     </bpmn:exclusiveGateway>
-    <bpmn:sequenceFlow id="Flow_1g7lzbc" sourceRef="Gateway_1ukyzed" targetRef="Activity_0l3rhgl" />
-    <bpmn:exclusiveGateway id="Gateway_1dtdv4e">
-      <bpmn:incoming>Flow_1s3dmbp</bpmn:incoming>
-      <bpmn:incoming>Flow_1984nvi</bpmn:incoming>
-      <bpmn:outgoing>Flow_0776eps</bpmn:outgoing>
+    <bpmn:sequenceFlow id="Flow_ToRegistryDecision" sourceRef="Gateway_JoinRegistry" targetRef="Gateway_RegistryVerified" />
+
+    <bpmn:exclusiveGateway id="Gateway_RegistryVerified" name="Registry confirmed?" default="Flow_RegistryNo">
+      <bpmn:incoming>Flow_ToRegistryDecision</bpmn:incoming>
+      <bpmn:outgoing>Flow_RegistryYes</bpmn:outgoing>
+      <bpmn:outgoing>Flow_RegistryNo</bpmn:outgoing>
     </bpmn:exclusiveGateway>
-    <bpmn:sequenceFlow id="Flow_1s3dmbp" sourceRef="Activity_0l3rhgl" targetRef="Gateway_1dtdv4e" />
-    <bpmn:sequenceFlow id="Flow_1984nvi" sourceRef="Activity_13we8ub" targetRef="Gateway_1dtdv4e" />
-    <bpmn:exclusiveGateway id="Gateway_07kw6vm" name="Registry okay?" default="Flow_1o6o7ja">
-      <bpmn:incoming>Flow_0776eps</bpmn:incoming>
-      <bpmn:outgoing>Flow_0j8b15i</bpmn:outgoing>
-      <bpmn:outgoing>Flow_1o6o7ja</bpmn:outgoing>
-    </bpmn:exclusiveGateway>
-    <bpmn:sequenceFlow id="Flow_0776eps" sourceRef="Gateway_1dtdv4e" targetRef="Gateway_07kw6vm" />
-    <bpmn:serviceTask id="Activity_0hck9gi" name="screening">
-      <bpmn:incoming>Flow_0j8b15i</bpmn:incoming>
-      <bpmn:outgoing>Flow_1iq0x1h</bpmn:outgoing>
+    <bpmn:sequenceFlow id="Flow_RegistryYes" name="Yes" sourceRef="Gateway_RegistryVerified" targetRef="Task_RequestScreening">
+      <bpmn:conditionExpression xsi:type="bpmn:tFormalExpression" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">=registryVerified = true</bpmn:conditionExpression>
+    </bpmn:sequenceFlow>
+    <bpmn:sequenceFlow id="Flow_RegistryNo" name="No" sourceRef="Gateway_RegistryVerified" targetRef="Gateway_JoinRejection" />
+
+    <bpmn:serviceTask id="Task_RequestScreening" name="Request sanctions &amp; PEP screening">
+      <bpmn:extensionElements>
+        <zeebe:taskDefinition type="screening-request" retries="5" />
+        <zeebe:ioMapping>
+          <zeebe:input source="=applicationId" target="applicationId" />
+          <zeebe:output source="=screeningRequestId" target="screeningRequestId" />
+        </zeebe:ioMapping>
+      </bpmn:extensionElements>
+      <bpmn:incoming>Flow_RegistryYes</bpmn:incoming>
+      <bpmn:outgoing>Flow_ToAwaitScreening</bpmn:outgoing>
     </bpmn:serviceTask>
-    <bpmn:sequenceFlow id="Flow_0j8b15i" name="yes" sourceRef="Gateway_07kw6vm" targetRef="Activity_0hck9gi" />
-    <bpmn:receiveTask id="Activity_1rbj2f7" name="wait for screening result">
-      <bpmn:incoming>Flow_1iq0x1h</bpmn:incoming>
-      <bpmn:outgoing>Flow_0l3aixg</bpmn:outgoing>
+    <bpmn:sequenceFlow id="Flow_ToAwaitScreening" sourceRef="Task_RequestScreening" targetRef="Task_AwaitScreening" />
+
+    <bpmn:receiveTask id="Task_AwaitScreening" name="Wait for screening result" messageRef="Message_ScreeningCompleted">
+      <bpmn:extensionElements>
+        <zeebe:ioMapping>
+          <zeebe:output source="=screeningMatch" target="screeningMatch" />
+          <zeebe:output source="=screeningReference" target="screeningReference" />
+        </zeebe:ioMapping>
+      </bpmn:extensionElements>
+      <bpmn:incoming>Flow_ToAwaitScreening</bpmn:incoming>
+      <bpmn:outgoing>Flow_ScreeningReceived</bpmn:outgoing>
     </bpmn:receiveTask>
-    <bpmn:sequenceFlow id="Flow_1iq0x1h" sourceRef="Activity_0hck9gi" targetRef="Activity_1rbj2f7" />
-    <bpmn:boundaryEvent id="Event_1u087rc" attachedToRef="Activity_1rbj2f7">
-      <bpmn:outgoing>Flow_173ucj8</bpmn:outgoing>
-      <bpmn:timerEventDefinition id="TimerEventDefinition_10mqim0" />
+    <bpmn:boundaryEvent id="Boundary_ScreeningOverdue" name="26 hours" attachedToRef="Task_AwaitScreening">
+      <bpmn:outgoing>Flow_ToChaseScreening</bpmn:outgoing>
+      <bpmn:timerEventDefinition>
+        <bpmn:timeDuration xsi:type="bpmn:tFormalExpression" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">PT26H</bpmn:timeDuration>
+      </bpmn:timerEventDefinition>
     </bpmn:boundaryEvent>
-    <bpmn:userTask id="Activity_0sywmso" name="overdue screening result">
+    <bpmn:sequenceFlow id="Flow_ToChaseScreening" sourceRef="Boundary_ScreeningOverdue" targetRef="Task_ChaseScreening" />
+
+    <bpmn:userTask id="Task_ChaseScreening" name="Chase overdue screening result">
       <bpmn:extensionElements>
         <zeebe:userTask />
+        <zeebe:formDefinition formId="chase-screening" />
+        <zeebe:assignmentDefinition candidateGroups="compliance-ops" />
+        <zeebe:ioMapping>
+          <zeebe:input source="=screeningRequestId" target="screeningRequestId" />
+          <zeebe:output source="=screeningMatch" target="screeningMatch" />
+          <zeebe:output source="=screeningReference" target="screeningReference" />
+        </zeebe:ioMapping>
       </bpmn:extensionElements>
-      <bpmn:incoming>Flow_173ucj8</bpmn:incoming>
-      <bpmn:outgoing>Flow_0didc3y</bpmn:outgoing>
+      <bpmn:incoming>Flow_ToChaseScreening</bpmn:incoming>
+      <bpmn:outgoing>Flow_ChaseDone</bpmn:outgoing>
     </bpmn:userTask>
-    <bpmn:sequenceFlow id="Flow_173ucj8" name="26 hours" sourceRef="Event_1u087rc" targetRef="Activity_0sywmso" />
-    <bpmn:exclusiveGateway id="Gateway_0hjwafr">
-      <bpmn:incoming>Flow_0didc3y</bpmn:incoming>
-      <bpmn:incoming>Flow_0l3aixg</bpmn:incoming>
-      <bpmn:outgoing>Flow_17rq1hd</bpmn:outgoing>
+
+    <bpmn:sequenceFlow id="Flow_ScreeningReceived" sourceRef="Task_AwaitScreening" targetRef="Gateway_JoinScreening" />
+    <bpmn:sequenceFlow id="Flow_ChaseDone" sourceRef="Task_ChaseScreening" targetRef="Gateway_JoinScreening" />
+    <bpmn:exclusiveGateway id="Gateway_JoinScreening">
+      <bpmn:incoming>Flow_ScreeningReceived</bpmn:incoming>
+      <bpmn:incoming>Flow_ChaseDone</bpmn:incoming>
+      <bpmn:outgoing>Flow_ToDueDiligence</bpmn:outgoing>
     </bpmn:exclusiveGateway>
-    <bpmn:sequenceFlow id="Flow_0didc3y" sourceRef="Activity_0sywmso" targetRef="Gateway_0hjwafr" />
-    <bpmn:sequenceFlow id="Flow_0l3aixg" sourceRef="Activity_1rbj2f7" targetRef="Gateway_0hjwafr" />
-    <bpmn:businessRuleTask id="Activity_1okqszl" name="determine due diligence level">
+    <bpmn:sequenceFlow id="Flow_ToDueDiligence" sourceRef="Gateway_JoinScreening" targetRef="Task_DueDiligence" />
+
+    <bpmn:businessRuleTask id="Task_DueDiligence" name="Determine due diligence level">
       <bpmn:extensionElements>
-        <zeebe:calledDecision />
+        <zeebe:calledDecision decisionId="due-diligence-level" resultVariable="dueDiligenceLevel" />
+        <zeebe:ioMapping>
+          <zeebe:input source="=screeningMatch" target="screeningMatch" />
+          <zeebe:input source="=country" target="country" />
+          <zeebe:input source="=legalForm" target="legalForm" />
+        </zeebe:ioMapping>
       </bpmn:extensionElements>
-      <bpmn:incoming>Flow_17rq1hd</bpmn:incoming>
-      <bpmn:outgoing>Flow_05mx8se</bpmn:outgoing>
+      <bpmn:incoming>Flow_ToDueDiligence</bpmn:incoming>
+      <bpmn:outgoing>Flow_ToEnhancedGateway</bpmn:outgoing>
     </bpmn:businessRuleTask>
-    <bpmn:sequenceFlow id="Flow_17rq1hd" sourceRef="Gateway_0hjwafr" targetRef="Activity_1okqszl" />
-    <bpmn:exclusiveGateway id="Gateway_1cu7vxd" name="Due diligence level?" default="Flow_1py4sup">
-      <bpmn:incoming>Flow_05mx8se</bpmn:incoming>
-      <bpmn:outgoing>Flow_1wtojy3</bpmn:outgoing>
-      <bpmn:outgoing>Flow_1py4sup</bpmn:outgoing>
+    <bpmn:sequenceFlow id="Flow_ToEnhancedGateway" sourceRef="Task_DueDiligence" targetRef="Gateway_Enhanced" />
+
+    <bpmn:exclusiveGateway id="Gateway_Enhanced" name="Due diligence level?" default="Flow_NotEnhanced">
+      <bpmn:incoming>Flow_ToEnhancedGateway</bpmn:incoming>
+      <bpmn:outgoing>Flow_Enhanced</bpmn:outgoing>
+      <bpmn:outgoing>Flow_NotEnhanced</bpmn:outgoing>
     </bpmn:exclusiveGateway>
-    <bpmn:sequenceFlow id="Flow_05mx8se" sourceRef="Activity_1okqszl" targetRef="Gateway_1cu7vxd" />
-    <bpmn:userTask id="Activity_0u0gt7o" name="review due diligence">
+    <bpmn:sequenceFlow id="Flow_Enhanced" name="Enhanced" sourceRef="Gateway_Enhanced" targetRef="Task_ComplianceReview">
+      <bpmn:conditionExpression xsi:type="bpmn:tFormalExpression" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">=dueDiligenceLevel = "enhanced"</bpmn:conditionExpression>
+    </bpmn:sequenceFlow>
+    <bpmn:sequenceFlow id="Flow_NotEnhanced" name="Simplified / standard" sourceRef="Gateway_Enhanced" targetRef="Gateway_JoinToCore" />
+
+    <bpmn:userTask id="Task_ComplianceReview" name="Review application due diligence">
       <bpmn:extensionElements>
         <zeebe:userTask />
+        <zeebe:formDefinition formId="compliance-review" />
+        <zeebe:assignmentDefinition candidateGroups="compliance-officers" />
+        <zeebe:ioMapping>
+          <zeebe:input source="=applicationId" target="applicationId" />
+          <zeebe:input source="=screeningReference" target="screeningReference" />
+          <zeebe:output source="=complianceDecision" target="complianceDecision" />
+        </zeebe:ioMapping>
       </bpmn:extensionElements>
-      <bpmn:incoming>Flow_1wtojy3</bpmn:incoming>
-      <bpmn:outgoing>Flow_1q53bse</bpmn:outgoing>
+      <bpmn:incoming>Flow_Enhanced</bpmn:incoming>
+      <bpmn:outgoing>Flow_ReviewDone</bpmn:outgoing>
     </bpmn:userTask>
-    <bpmn:sequenceFlow id="Flow_1wtojy3" name="enhanced" sourceRef="Gateway_1cu7vxd" targetRef="Activity_0u0gt7o" />
-    <bpmn:boundaryEvent id="Event_12aew91" attachedToRef="Activity_0u0gt7o">
-      <bpmn:outgoing>Flow_0dcwx0r</bpmn:outgoing>
-      <bpmn:timerEventDefinition id="TimerEventDefinition_1c6wqvi" />
+    <bpmn:boundaryEvent id="Boundary_ReviewOverdue" name="48 hours" cancelActivity="false" attachedToRef="Task_ComplianceReview">
+      <bpmn:outgoing>Flow_ToEscalate</bpmn:outgoing>
+      <bpmn:timerEventDefinition>
+        <bpmn:timeDuration xsi:type="bpmn:tFormalExpression" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">PT48H</bpmn:timeDuration>
+      </bpmn:timerEventDefinition>
     </bpmn:boundaryEvent>
-    <bpmn:serviceTask id="Activity_0yok5jv" name="escalate to head of compliance">
-      <bpmn:incoming>Flow_0dcwx0r</bpmn:incoming>
-      <bpmn:outgoing>Flow_1kg96nf</bpmn:outgoing>
+    <bpmn:sequenceFlow id="Flow_ToEscalate" sourceRef="Boundary_ReviewOverdue" targetRef="Task_EscalateToHead" />
+    <bpmn:serviceTask id="Task_EscalateToHead" name="Escalate to Head of Compliance">
+      <bpmn:extensionElements>
+        <zeebe:taskDefinition type="compliance-escalation" retries="3" />
+        <zeebe:ioMapping>
+          <zeebe:input source="=applicationId" target="applicationId" />
+        </zeebe:ioMapping>
+      </bpmn:extensionElements>
+      <bpmn:incoming>Flow_ToEscalate</bpmn:incoming>
+      <bpmn:outgoing>Flow_EscalationDone</bpmn:outgoing>
     </bpmn:serviceTask>
-    <bpmn:sequenceFlow id="Flow_0dcwx0r" sourceRef="Event_12aew91" targetRef="Activity_0yok5jv" />
-    <bpmn:endEvent id="Event_1rwbflg">
-      <bpmn:incoming>Flow_1kg96nf</bpmn:incoming>
+    <bpmn:sequenceFlow id="Flow_EscalationDone" sourceRef="Task_EscalateToHead" targetRef="End_Escalated" />
+    <bpmn:endEvent id="End_Escalated" name="Escalation sent">
+      <bpmn:incoming>Flow_EscalationDone</bpmn:incoming>
     </bpmn:endEvent>
-    <bpmn:sequenceFlow id="Flow_1kg96nf" sourceRef="Activity_0yok5jv" targetRef="Event_1rwbflg" />
-    <bpmn:exclusiveGateway id="Gateway_0ulzuns" name="Approved?" default="Flow_0oj7jg4">
-      <bpmn:incoming>Flow_1q53bse</bpmn:incoming>
-      <bpmn:outgoing>Flow_0zhyovu</bpmn:outgoing>
-      <bpmn:outgoing>Flow_0oj7jg4</bpmn:outgoing>
+
+    <bpmn:sequenceFlow id="Flow_ReviewDone" sourceRef="Task_ComplianceReview" targetRef="Gateway_Approved" />
+    <bpmn:exclusiveGateway id="Gateway_Approved" name="Approved?" default="Flow_Rejected">
+      <bpmn:incoming>Flow_ReviewDone</bpmn:incoming>
+      <bpmn:outgoing>Flow_Approved</bpmn:outgoing>
+      <bpmn:outgoing>Flow_Rejected</bpmn:outgoing>
     </bpmn:exclusiveGateway>
-    <bpmn:sequenceFlow id="Flow_1q53bse" sourceRef="Activity_0u0gt7o" targetRef="Gateway_0ulzuns" />
-    <bpmn:exclusiveGateway id="Gateway_1oir3zq">
-      <bpmn:incoming>Flow_0zhyovu</bpmn:incoming>
-      <bpmn:incoming>Flow_1py4sup</bpmn:incoming>
-      <bpmn:outgoing>Flow_1yusbf2</bpmn:outgoing>
+    <bpmn:sequenceFlow id="Flow_Approved" name="Yes" sourceRef="Gateway_Approved" targetRef="Gateway_JoinToCore">
+      <bpmn:conditionExpression xsi:type="bpmn:tFormalExpression" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">=complianceDecision = "APPROVED"</bpmn:conditionExpression>
+    </bpmn:sequenceFlow>
+    <bpmn:sequenceFlow id="Flow_Rejected" name="No" sourceRef="Gateway_Approved" targetRef="Gateway_JoinRejection" />
+
+    <bpmn:exclusiveGateway id="Gateway_JoinToCore">
+      <bpmn:incoming>Flow_NotEnhanced</bpmn:incoming>
+      <bpmn:incoming>Flow_Approved</bpmn:incoming>
+      <bpmn:outgoing>Flow_ToCreateCustomer</bpmn:outgoing>
     </bpmn:exclusiveGateway>
-    <bpmn:sequenceFlow id="Flow_0zhyovu" name="yes" sourceRef="Gateway_0ulzuns" targetRef="Gateway_1oir3zq" />
-    <bpmn:serviceTask id="Activity_1r4kq31" name="create customer in core banking">
-      <bpmn:incoming>Flow_1yusbf2</bpmn:incoming>
-      <bpmn:outgoing>Flow_1ff6b60</bpmn:outgoing>
+    <bpmn:sequenceFlow id="Flow_ToCreateCustomer" sourceRef="Gateway_JoinToCore" targetRef="Task_CreateCustomer" />
+
+    <bpmn:serviceTask id="Task_CreateCustomer" name="Create customer in core banking">
+      <bpmn:extensionElements>
+        <zeebe:taskDefinition type="core-banking-create-customer" retries="10" />
+        <zeebe:ioMapping>
+          <zeebe:input source="=applicationId" target="applicationId" />
+          <zeebe:input source="=registrationNumber" target="registrationNumber" />
+          <zeebe:input source="=businessName" target="businessName" />
+          <zeebe:input source="=country" target="country" />
+          <zeebe:output source="=customerId" target="customerId" />
+          <zeebe:output source="=customerCreatedByProcess" target="customerCreatedByProcess" />
+        </zeebe:ioMapping>
+      </bpmn:extensionElements>
+      <bpmn:incoming>Flow_ToCreateCustomer</bpmn:incoming>
+      <bpmn:outgoing>Flow_ToCreateAccount</bpmn:outgoing>
     </bpmn:serviceTask>
-    <bpmn:sequenceFlow id="Flow_1yusbf2" sourceRef="Gateway_1oir3zq" targetRef="Activity_1r4kq31" />
-    <bpmn:exclusiveGateway id="Gateway_0yjcqme">
-      <bpmn:incoming>Flow_1ff6b60</bpmn:incoming>
-      <bpmn:incoming>Flow_1rloyd8</bpmn:incoming>
-      <bpmn:incoming>Flow_00lekjr</bpmn:incoming>
-      <bpmn:outgoing>Flow_1j47y7u</bpmn:outgoing>
+    <bpmn:sequenceFlow id="Flow_ToCreateAccount" sourceRef="Task_CreateCustomer" targetRef="Gateway_JoinAccount" />
+
+    <bpmn:exclusiveGateway id="Gateway_JoinAccount">
+      <bpmn:incoming>Flow_ToCreateAccount</bpmn:incoming>
+      <bpmn:incoming>Flow_RetryAccount</bpmn:incoming>
+      <bpmn:incoming>Flow_AccountNotCreated</bpmn:incoming>
+      <bpmn:outgoing>Flow_ToAccountTask</bpmn:outgoing>
     </bpmn:exclusiveGateway>
-    <bpmn:sequenceFlow id="Flow_1ff6b60" sourceRef="Activity_1r4kq31" targetRef="Gateway_0yjcqme" />
-    <bpmn:serviceTask id="Activity_0a252d1" name="create account in core banking">
-      <bpmn:incoming>Flow_1j47y7u</bpmn:incoming>
-      <bpmn:outgoing>Flow_0grli2d</bpmn:outgoing>
+    <bpmn:sequenceFlow id="Flow_ToAccountTask" sourceRef="Gateway_JoinAccount" targetRef="Task_CreateAccount" />
+
+    <bpmn:serviceTask id="Task_CreateAccount" name="Create account in core banking">
+      <bpmn:extensionElements>
+        <zeebe:taskDefinition type="core-banking-create-account" retries="10" />
+        <zeebe:ioMapping>
+          <zeebe:input source="=applicationId" target="applicationId" />
+          <zeebe:input source="=customerId" target="customerId" />
+          <zeebe:input source="=country" target="country" />
+          <zeebe:output source="=accountNumber" target="accountNumber" />
+        </zeebe:ioMapping>
+      </bpmn:extensionElements>
+      <bpmn:incoming>Flow_ToAccountTask</bpmn:incoming>
+      <bpmn:outgoing>Flow_ToJoinWelcome</bpmn:outgoing>
     </bpmn:serviceTask>
-    <bpmn:sequenceFlow id="Flow_1j47y7u" sourceRef="Gateway_0yjcqme" targetRef="Activity_0a252d1" />
-    <bpmn:exclusiveGateway id="Gateway_0uqwt7r">
-      <bpmn:incoming>Flow_0grli2d</bpmn:incoming>
-      <bpmn:incoming>Flow_0pvelee</bpmn:incoming>
-      <bpmn:outgoing>Flow_1lhe0ab</bpmn:outgoing>
+
+    <bpmn:boundaryEvent id="Boundary_AccountValidation" name="Account rejected (422)" attachedToRef="Task_CreateAccount">
+      <bpmn:extensionElements>
+        <zeebe:ioMapping>
+          <zeebe:output source="=accountValidationError" target="accountValidationError" />
+        </zeebe:ioMapping>
+      </bpmn:extensionElements>
+      <bpmn:outgoing>Flow_ToResolveValidation</bpmn:outgoing>
+      <bpmn:errorEventDefinition errorRef="Error_AccountValidation" />
+    </bpmn:boundaryEvent>
+    <bpmn:sequenceFlow id="Flow_ToResolveValidation" sourceRef="Boundary_AccountValidation" targetRef="Task_ResolveAccountValidation" />
+
+    <bpmn:userTask id="Task_ResolveAccountValidation" name="Resolve rejected account">
+      <bpmn:extensionElements>
+        <zeebe:userTask />
+        <zeebe:formDefinition formId="resolve-rejected-account" />
+        <zeebe:assignmentDefinition candidateGroups="core-banking-ops" />
+        <zeebe:ioMapping>
+          <zeebe:input source="=applicationId" target="applicationId" />
+          <zeebe:input source="=customerId" target="customerId" />
+          <zeebe:input source="=accountValidationError" target="accountValidationError" />
+          <zeebe:input source="=customerCreatedByProcess" target="customerCreatedByProcess" />
+          <zeebe:output source="=accountResolution" target="accountResolution" />
+        </zeebe:ioMapping>
+      </bpmn:extensionElements>
+      <bpmn:incoming>Flow_ToResolveValidation</bpmn:incoming>
+      <bpmn:outgoing>Flow_ResolutionDone</bpmn:outgoing>
+    </bpmn:userTask>
+    <bpmn:sequenceFlow id="Flow_ResolutionDone" sourceRef="Task_ResolveAccountValidation" targetRef="Gateway_Resolution" />
+    <bpmn:exclusiveGateway id="Gateway_Resolution" name="Resolution?" default="Flow_CloseCustomer">
+      <bpmn:incoming>Flow_ResolutionDone</bpmn:incoming>
+      <bpmn:outgoing>Flow_RetryAccount</bpmn:outgoing>
+      <bpmn:outgoing>Flow_CloseCustomer</bpmn:outgoing>
     </bpmn:exclusiveGateway>
-    <bpmn:sequenceFlow id="Flow_0grli2d" sourceRef="Activity_0a252d1" targetRef="Gateway_0uqwt7r" />
-    <bpmn:serviceTask id="Activity_1tijg8s" name="send welcome email">
-      <bpmn:incoming>Flow_1lhe0ab</bpmn:incoming>
-      <bpmn:outgoing>Flow_00xn00c</bpmn:outgoing>
+    <bpmn:sequenceFlow id="Flow_RetryAccount" name="Data cleanup, retry" sourceRef="Gateway_Resolution" targetRef="Gateway_JoinAccount">
+      <bpmn:conditionExpression xsi:type="bpmn:tFormalExpression" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">=accountResolution = "RETRY"</bpmn:conditionExpression>
+    </bpmn:sequenceFlow>
+    <bpmn:sequenceFlow id="Flow_CloseCustomer" name="Cannot open" sourceRef="Gateway_Resolution" targetRef="Gateway_CustomerOurs" />
+    <bpmn:exclusiveGateway id="Gateway_CustomerOurs" name="Customer created by this application?" default="Flow_CustomerOursNo">
+      <bpmn:incoming>Flow_CloseCustomer</bpmn:incoming>
+      <bpmn:outgoing>Flow_CustomerOursYes</bpmn:outgoing>
+      <bpmn:outgoing>Flow_CustomerOursNo</bpmn:outgoing>
+    </bpmn:exclusiveGateway>
+    <bpmn:sequenceFlow id="Flow_CustomerOursYes" name="Yes" sourceRef="Gateway_CustomerOurs" targetRef="Task_CloseCustomer">
+      <bpmn:conditionExpression xsi:type="bpmn:tFormalExpression" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">=customerCreatedByProcess = true</bpmn:conditionExpression>
+    </bpmn:sequenceFlow>
+    <bpmn:sequenceFlow id="Flow_CustomerOursNo" name="No, existing customer" sourceRef="Gateway_CustomerOurs" targetRef="Gateway_JoinRejection" />
+
+    <bpmn:userTask id="Task_CloseCustomer" name="Close customer record in core banking">
+      <bpmn:extensionElements>
+        <zeebe:userTask />
+        <zeebe:formDefinition formId="close-customer" />
+        <zeebe:assignmentDefinition candidateGroups="core-banking-ops" />
+        <zeebe:ioMapping>
+          <zeebe:input source="=customerId" target="customerId" />
+        </zeebe:ioMapping>
+      </bpmn:extensionElements>
+      <bpmn:incoming>Flow_CustomerOursYes</bpmn:incoming>
+      <bpmn:outgoing>Flow_ClosedToRejection</bpmn:outgoing>
+    </bpmn:userTask>
+    <bpmn:sequenceFlow id="Flow_ClosedToRejection" sourceRef="Task_CloseCustomer" targetRef="Gateway_JoinRejection" />
+
+    <bpmn:boundaryEvent id="Boundary_AccountUnknown" name="Outcome unknown" attachedToRef="Task_CreateAccount">
+      <bpmn:outgoing>Flow_ToVerifyAccount</bpmn:outgoing>
+      <bpmn:errorEventDefinition errorRef="Error_AccountOutcomeUnknown" />
+    </bpmn:boundaryEvent>
+    <bpmn:sequenceFlow id="Flow_ToVerifyAccount" sourceRef="Boundary_AccountUnknown" targetRef="Task_VerifyAccount" />
+    <bpmn:userTask id="Task_VerifyAccount" name="Check whether account was created">
+      <bpmn:extensionElements>
+        <zeebe:userTask />
+        <zeebe:formDefinition formId="verify-account" />
+        <zeebe:assignmentDefinition candidateGroups="core-banking-ops" />
+        <zeebe:ioMapping>
+          <zeebe:input source="=customerId" target="customerId" />
+          <zeebe:output source="=accountNumber" target="accountNumber" />
+        </zeebe:ioMapping>
+      </bpmn:extensionElements>
+      <bpmn:incoming>Flow_ToVerifyAccount</bpmn:incoming>
+      <bpmn:outgoing>Flow_VerifyDone</bpmn:outgoing>
+    </bpmn:userTask>
+    <bpmn:sequenceFlow id="Flow_VerifyDone" sourceRef="Task_VerifyAccount" targetRef="Gateway_AccountFound" />
+    <bpmn:exclusiveGateway id="Gateway_AccountFound" name="Account exists?" default="Flow_AccountNotCreated">
+      <bpmn:incoming>Flow_VerifyDone</bpmn:incoming>
+      <bpmn:outgoing>Flow_AccountFound</bpmn:outgoing>
+      <bpmn:outgoing>Flow_AccountNotCreated</bpmn:outgoing>
+    </bpmn:exclusiveGateway>
+    <bpmn:sequenceFlow id="Flow_AccountFound" name="Yes" sourceRef="Gateway_AccountFound" targetRef="Gateway_JoinWelcome">
+      <bpmn:conditionExpression xsi:type="bpmn:tFormalExpression" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">=accountNumber != null and string length(accountNumber) &gt; 0</bpmn:conditionExpression>
+    </bpmn:sequenceFlow>
+    <bpmn:sequenceFlow id="Flow_AccountNotCreated" name="No, retry" sourceRef="Gateway_AccountFound" targetRef="Gateway_JoinAccount" />
+
+    <bpmn:sequenceFlow id="Flow_ToJoinWelcome" sourceRef="Task_CreateAccount" targetRef="Gateway_JoinWelcome" />
+    <bpmn:exclusiveGateway id="Gateway_JoinWelcome">
+      <bpmn:incoming>Flow_ToJoinWelcome</bpmn:incoming>
+      <bpmn:incoming>Flow_AccountFound</bpmn:incoming>
+      <bpmn:outgoing>Flow_ToWelcome</bpmn:outgoing>
+    </bpmn:exclusiveGateway>
+    <bpmn:sequenceFlow id="Flow_ToWelcome" sourceRef="Gateway_JoinWelcome" targetRef="Task_SendWelcome" />
+
+    <bpmn:serviceTask id="Task_SendWelcome" name="Send welcome email">
+      <bpmn:extensionElements>
+        <zeebe:taskDefinition type="send-welcome-email" retries="5" />
+        <zeebe:ioMapping>
+          <zeebe:input source="=applicationId" target="applicationId" />
+          <zeebe:input source="=contactEmail" target="contactEmail" />
+          <zeebe:input source="=businessName" target="businessName" />
+          <zeebe:input source="=accountNumber" target="accountNumber" />
+        </zeebe:ioMapping>
+      </bpmn:extensionElements>
+      <bpmn:incoming>Flow_ToWelcome</bpmn:incoming>
+      <bpmn:outgoing>Flow_ToEndOpened</bpmn:outgoing>
     </bpmn:serviceTask>
-    <bpmn:sequenceFlow id="Flow_1lhe0ab" sourceRef="Gateway_0uqwt7r" targetRef="Activity_1tijg8s" />
-    <bpmn:endEvent id="Event_12eu3jf" name="Account opened">
-      <bpmn:incoming>Flow_00xn00c</bpmn:incoming>
+    <bpmn:sequenceFlow id="Flow_ToEndOpened" sourceRef="Task_SendWelcome" targetRef="End_AccountOpened" />
+    <bpmn:endEvent id="End_AccountOpened" name="Account opened">
+      <bpmn:incoming>Flow_ToEndOpened</bpmn:incoming>
     </bpmn:endEvent>
-    <bpmn:sequenceFlow id="Flow_00xn00c" sourceRef="Activity_1tijg8s" targetRef="Event_12eu3jf" />
-    <bpmn:boundaryEvent id="Event_0kjml2y" attachedToRef="Activity_13we8ub">
-      <bpmn:outgoing>Flow_1e4ljdw</bpmn:outgoing>
-      <bpmn:errorEventDefinition id="ErrorEventDefinition_1czedwh" />
-    </bpmn:boundaryEvent>
-    <bpmn:sequenceFlow id="Flow_1e4ljdw" name="Not in registry" sourceRef="Event_0kjml2y" targetRef="Gateway_1ukyzed" />
-    <bpmn:serviceTask id="Activity_0ghqjjd" name="send rejection email">
-      <bpmn:incoming>Flow_18jjgvb</bpmn:incoming>
-      <bpmn:outgoing>Flow_1f241xl</bpmn:outgoing>
+
+    <bpmn:exclusiveGateway id="Gateway_JoinRejection">
+      <bpmn:incoming>Flow_RegistryNo</bpmn:incoming>
+      <bpmn:incoming>Flow_Rejected</bpmn:incoming>
+      <bpmn:incoming>Flow_ClosedToRejection</bpmn:incoming>
+      <bpmn:incoming>Flow_CustomerOursNo</bpmn:incoming>
+      <bpmn:outgoing>Flow_ToSendRejection</bpmn:outgoing>
+    </bpmn:exclusiveGateway>
+    <bpmn:sequenceFlow id="Flow_ToSendRejection" sourceRef="Gateway_JoinRejection" targetRef="Task_SendRejection" />
+    <bpmn:serviceTask id="Task_SendRejection" name="Send rejection email">
+      <bpmn:extensionElements>
+        <zeebe:taskDefinition type="send-rejection-email" retries="5" />
+        <zeebe:ioMapping>
+          <zeebe:input source="=applicationId" target="applicationId" />
+          <zeebe:input source="=contactEmail" target="contactEmail" />
+          <zeebe:input source="=businessName" target="businessName" />
+        </zeebe:ioMapping>
+      </bpmn:extensionElements>
+      <bpmn:incoming>Flow_ToSendRejection</bpmn:incoming>
+      <bpmn:outgoing>Flow_ToEndRejected</bpmn:outgoing>
     </bpmn:serviceTask>
-    <bpmn:endEvent id="Event_1ldygii" name="Application rejected">
-      <bpmn:incoming>Flow_1f241xl</bpmn:incoming>
+    <bpmn:sequenceFlow id="Flow_ToEndRejected" sourceRef="Task_SendRejection" targetRef="End_Rejected" />
+    <bpmn:endEvent id="End_Rejected" name="Application rejected">
+      <bpmn:incoming>Flow_ToEndRejected</bpmn:incoming>
     </bpmn:endEvent>
-    <bpmn:sequenceFlow id="Flow_1f241xl" sourceRef="Activity_0ghqjjd" targetRef="Event_1ldygii" />
-    <bpmn:sequenceFlow id="Flow_1py4sup" name="standard due diligence" sourceRef="Gateway_1cu7vxd" targetRef="Gateway_1oir3zq" />
-    <bpmn:sequenceFlow id="Flow_0oj7jg4" name="no" sourceRef="Gateway_0ulzuns" targetRef="Gateway_0pspq9w" />
-    <bpmn:boundaryEvent id="Event_0fk8tvj" attachedToRef="Activity_0a252d1">
-      <bpmn:outgoing>Flow_15kgtmx</bpmn:outgoing>
-      <bpmn:errorEventDefinition id="ErrorEventDefinition_1sm9h9e" />
-    </bpmn:boundaryEvent>
-    <bpmn:boundaryEvent id="Event_0djuzdn" attachedToRef="Activity_0a252d1">
-      <bpmn:outgoing>Flow_0931ync</bpmn:outgoing>
-      <bpmn:errorEventDefinition id="ErrorEventDefinition_1226gem" />
-    </bpmn:boundaryEvent>
-    <bpmn:userTask id="Activity_1dhbmk0" name="check account creation status">
-      <bpmn:extensionElements>
-        <zeebe:userTask />
-      </bpmn:extensionElements>
-      <bpmn:incoming>Flow_0931ync</bpmn:incoming>
-      <bpmn:outgoing>Flow_1r40lm3</bpmn:outgoing>
-    </bpmn:userTask>
-    <bpmn:exclusiveGateway id="Gateway_1v0luv3" name="Account exists?" default="Flow_1rloyd8">
-      <bpmn:incoming>Flow_1r40lm3</bpmn:incoming>
-      <bpmn:outgoing>Flow_0pvelee</bpmn:outgoing>
-      <bpmn:outgoing>Flow_1rloyd8</bpmn:outgoing>
-    </bpmn:exclusiveGateway>
-    <bpmn:sequenceFlow id="Flow_0931ync" sourceRef="Event_0djuzdn" targetRef="Activity_1dhbmk0" />
-    <bpmn:sequenceFlow id="Flow_1r40lm3" sourceRef="Activity_1dhbmk0" targetRef="Gateway_1v0luv3" />
-    <bpmn:sequenceFlow id="Flow_0pvelee" name="yes" sourceRef="Gateway_1v0luv3" targetRef="Gateway_0uqwt7r" />
-    <bpmn:sequenceFlow id="Flow_1rloyd8" name="No, retry" sourceRef="Gateway_1v0luv3" targetRef="Gateway_0yjcqme" />
-    <bpmn:userTask id="Activity_0b2122w" name="Resolve rejected account">
-      <bpmn:extensionElements>
-        <zeebe:userTask />
-      </bpmn:extensionElements>
-      <bpmn:incoming>Flow_15kgtmx</bpmn:incoming>
-      <bpmn:outgoing>Flow_0pv1uf0</bpmn:outgoing>
-    </bpmn:userTask>
-    <bpmn:exclusiveGateway id="Gateway_1yjfdq7" name="Resolution?" default="Flow_0e09sol">
-      <bpmn:incoming>Flow_0pv1uf0</bpmn:incoming>
-      <bpmn:outgoing>Flow_0e09sol</bpmn:outgoing>
-      <bpmn:outgoing>Flow_00lekjr</bpmn:outgoing>
-    </bpmn:exclusiveGateway>
-    <bpmn:sequenceFlow id="Flow_0pv1uf0" sourceRef="Activity_0b2122w" targetRef="Gateway_1yjfdq7" />
-    <bpmn:exclusiveGateway id="Gateway_18hezfj" name="Customer created by this application?" default="Flow_0yqlvj9">
-      <bpmn:incoming>Flow_0e09sol</bpmn:incoming>
-      <bpmn:outgoing>Flow_113usls</bpmn:outgoing>
-      <bpmn:outgoing>Flow_0yqlvj9</bpmn:outgoing>
-    </bpmn:exclusiveGateway>
-    <bpmn:sequenceFlow id="Flow_0e09sol" name="Cannot open" sourceRef="Gateway_1yjfdq7" targetRef="Gateway_18hezfj" />
-    <bpmn:sequenceFlow id="Flow_00lekjr" name="Data cleanup, retry" sourceRef="Gateway_1yjfdq7" targetRef="Gateway_0yjcqme" />
-    <bpmn:sequenceFlow id="Flow_15kgtmx" name="Account rejected (422)" sourceRef="Event_0fk8tvj" targetRef="Activity_0b2122w" />
-    <bpmn:userTask id="Activity_0s8bvg3" name="Close customer record in core banking">
-      <bpmn:extensionElements>
-        <zeebe:userTask />
-      </bpmn:extensionElements>
-      <bpmn:incoming>Flow_113usls</bpmn:incoming>
-      <bpmn:outgoing>Flow_00iv9zw</bpmn:outgoing>
-    </bpmn:userTask>
-    <bpmn:sequenceFlow id="Flow_113usls" name="yes" sourceRef="Gateway_18hezfj" targetRef="Activity_0s8bvg3" />
-    <bpmn:exclusiveGateway id="Gateway_0pspq9w">
-      <bpmn:incoming>Flow_0oj7jg4</bpmn:incoming>
-      <bpmn:incoming>Flow_00iv9zw</bpmn:incoming>
-      <bpmn:incoming>Flow_1o6o7ja</bpmn:incoming>
-      <bpmn:incoming>Flow_0yqlvj9</bpmn:incoming>
-      <bpmn:outgoing>Flow_18jjgvb</bpmn:outgoing>
-    </bpmn:exclusiveGateway>
-    <bpmn:sequenceFlow id="Flow_18jjgvb" sourceRef="Gateway_0pspq9w" targetRef="Activity_0ghqjjd" />
-    <bpmn:sequenceFlow id="Flow_00iv9zw" sourceRef="Activity_0s8bvg3" targetRef="Gateway_0pspq9w" />
-    <bpmn:sequenceFlow id="Flow_1o6o7ja" name="No" sourceRef="Gateway_07kw6vm" targetRef="Gateway_0pspq9w" />
-    <bpmn:sequenceFlow id="Flow_0yqlvj9" name="No, existing customer" sourceRef="Gateway_18hezfj" targetRef="Gateway_0pspq9w" />
   </bpmn:process>
+
+  <bpmn:message id="Message_ApplicationSubmitted" name="ApplicationSubmitted" />
+  <bpmn:message id="Message_ScreeningCompleted" name="ScreeningCompleted">
+    <bpmn:extensionElements>
+      <zeebe:subscription correlationKey="=applicationId" />
+    </bpmn:extensionElements>
+  </bpmn:message>
+  <bpmn:error id="Error_RegistryNotFound" name="Registry: business not found" errorCode="REGISTRY_NOT_FOUND" />
+  <bpmn:error id="Error_AccountValidation" name="Core banking: account validation failed" errorCode="ACCOUNT_VALIDATION_FAILED" />
+  <bpmn:error id="Error_AccountOutcomeUnknown" name="Core banking: account outcome unknown" errorCode="ACCOUNT_OUTCOME_UNKNOWN" />
   <bpmndi:BPMNDiagram id="BPMNDiagram_1">
-    <bpmndi:BPMNPlane id="BPMNPlane_1" bpmnElement="Process_04kln1i">
-      <bpmndi:BPMNShape id="StartEvent_1_di" bpmnElement="StartEvent_1">
-        <dc:Bounds x="182" y="172" width="36" height="36" />
-        <bpmndi:BPMNLabel>
-          <dc:Bounds x="173" y="215" width="54" height="27" />
-        </bpmndi:BPMNLabel>
-      </bpmndi:BPMNShape>
-      <bpmndi:BPMNShape id="Gateway_0si44z1_di" bpmnElement="Gateway_0si44z1" isMarkerVisible="true">
-        <dc:Bounds x="275" y="165" width="50" height="50" />
-        <bpmndi:BPMNLabel>
-          <dc:Bounds x="277" y="141" width="45" height="14" />
-        </bpmndi:BPMNLabel>
-      </bpmndi:BPMNShape>
-      <bpmndi:BPMNShape id="Activity_13we8ub_di" bpmnElement="Activity_13we8ub">
-        <dc:Bounds x="500" y="150" width="100" height="80" />
-        <bpmndi:BPMNLabel />
-      </bpmndi:BPMNShape>
-      <bpmndi:BPMNShape id="Gateway_1ukyzed_di" bpmnElement="Gateway_1ukyzed" isMarkerVisible="true">
-        <dc:Bounds x="615" y="345" width="50" height="50" />
-      </bpmndi:BPMNShape>
-      <bpmndi:BPMNShape id="Gateway_1dtdv4e_di" bpmnElement="Gateway_1dtdv4e" isMarkerVisible="true">
-        <dc:Bounds x="745" y="165" width="50" height="50" />
-      </bpmndi:BPMNShape>
-      <bpmndi:BPMNShape id="Activity_0l3rhgl_di" bpmnElement="Activity_0l3rhgl">
-        <dc:Bounds x="720" y="330" width="100" height="80" />
-        <bpmndi:BPMNLabel />
-      </bpmndi:BPMNShape>
-      <bpmndi:BPMNShape id="Gateway_07kw6vm_di" bpmnElement="Gateway_07kw6vm" isMarkerVisible="true">
-        <dc:Bounds x="945" y="165" width="50" height="50" />
-        <bpmndi:BPMNLabel>
-          <dc:Bounds x="933" y="141" width="73" height="14" />
-        </bpmndi:BPMNLabel>
-      </bpmndi:BPMNShape>
-      <bpmndi:BPMNShape id="Activity_0hck9gi_di" bpmnElement="Activity_0hck9gi">
-        <dc:Bounds x="1190" y="150" width="100" height="80" />
-        <bpmndi:BPMNLabel />
-      </bpmndi:BPMNShape>
-      <bpmndi:BPMNShape id="Activity_1rbj2f7_di" bpmnElement="Activity_1rbj2f7">
-        <dc:Bounds x="1480" y="150" width="100" height="80" />
-        <bpmndi:BPMNLabel />
-      </bpmndi:BPMNShape>
-      <bpmndi:BPMNShape id="Activity_0sywmso_di" bpmnElement="Activity_0sywmso">
-        <dc:Bounds x="1670" y="310" width="100" height="80" />
-        <bpmndi:BPMNLabel />
-      </bpmndi:BPMNShape>
-      <bpmndi:BPMNShape id="Gateway_0hjwafr_di" bpmnElement="Gateway_0hjwafr" isMarkerVisible="true">
-        <dc:Bounds x="1695" y="165" width="50" height="50" />
-      </bpmndi:BPMNShape>
-      <bpmndi:BPMNShape id="Activity_1okqszl_di" bpmnElement="Activity_1okqszl">
-        <dc:Bounds x="1880" y="150" width="100" height="80" />
-        <bpmndi:BPMNLabel />
-      </bpmndi:BPMNShape>
-      <bpmndi:BPMNShape id="Gateway_1cu7vxd_di" bpmnElement="Gateway_1cu7vxd" isMarkerVisible="true">
-        <dc:Bounds x="2125" y="165" width="50" height="50" />
-        <bpmndi:BPMNLabel>
-          <dc:Bounds x="2117" y="222" width="67" height="27" />
-        </bpmndi:BPMNLabel>
-      </bpmndi:BPMNShape>
-      <bpmndi:BPMNShape id="Activity_0u0gt7o_di" bpmnElement="Activity_0u0gt7o">
-        <dc:Bounds x="2350" y="150" width="100" height="80" />
-        <bpmndi:BPMNLabel />
-      </bpmndi:BPMNShape>
-      <bpmndi:BPMNShape id="Gateway_0ulzuns_di" bpmnElement="Gateway_0ulzuns" isMarkerVisible="true">
-        <dc:Bounds x="2555" y="165" width="50" height="50" />
-        <bpmndi:BPMNLabel>
-          <dc:Bounds x="2593" y="215" width="54" height="14" />
-        </bpmndi:BPMNLabel>
-      </bpmndi:BPMNShape>
-      <bpmndi:BPMNShape id="Gateway_1oir3zq_di" bpmnElement="Gateway_1oir3zq" isMarkerVisible="true">
-        <dc:Bounds x="2725" y="165" width="50" height="50" />
-      </bpmndi:BPMNShape>
-      <bpmndi:BPMNShape id="Activity_1r4kq31_di" bpmnElement="Activity_1r4kq31">
-        <dc:Bounds x="2910" y="150" width="100" height="80" />
-        <bpmndi:BPMNLabel />
-      </bpmndi:BPMNShape>
-      <bpmndi:BPMNShape id="Gateway_0yjcqme_di" bpmnElement="Gateway_0yjcqme" isMarkerVisible="true">
-        <dc:Bounds x="3125" y="165" width="50" height="50" />
-      </bpmndi:BPMNShape>
-      <bpmndi:BPMNShape id="Activity_0a252d1_di" bpmnElement="Activity_0a252d1">
-        <dc:Bounds x="3350" y="150" width="100" height="80" />
-        <bpmndi:BPMNLabel />
-      </bpmndi:BPMNShape>
-      <bpmndi:BPMNShape id="Gateway_0uqwt7r_di" bpmnElement="Gateway_0uqwt7r" isMarkerVisible="true">
-        <dc:Bounds x="3875" y="165" width="50" height="50" />
-      </bpmndi:BPMNShape>
-      <bpmndi:BPMNShape id="Activity_1tijg8s_di" bpmnElement="Activity_1tijg8s">
-        <dc:Bounds x="4170" y="150" width="100" height="80" />
-        <bpmndi:BPMNLabel />
-      </bpmndi:BPMNShape>
-      <bpmndi:BPMNShape id="Event_12eu3jf_di" bpmnElement="Event_12eu3jf">
-        <dc:Bounds x="4502" y="172" width="36" height="36" />
-        <bpmndi:BPMNLabel>
-          <dc:Bounds x="4480" y="215" width="80" height="14" />
-        </bpmndi:BPMNLabel>
-      </bpmndi:BPMNShape>
-      <bpmndi:BPMNShape id="Activity_0yok5jv_di" bpmnElement="Activity_0yok5jv">
-        <dc:Bounds x="2340" y="310" width="100" height="80" />
-        <bpmndi:BPMNLabel />
-      </bpmndi:BPMNShape>
-      <bpmndi:BPMNShape id="Event_1rwbflg_di" bpmnElement="Event_1rwbflg">
-        <dc:Bounds x="2372" y="472" width="36" height="36" />
-      </bpmndi:BPMNShape>
-      <bpmndi:BPMNShape id="Activity_1dhbmk0_di" bpmnElement="Activity_1dhbmk0">
-        <dc:Bounds x="3520" y="310" width="100" height="80" />
-        <bpmndi:BPMNLabel />
-      </bpmndi:BPMNShape>
-      <bpmndi:BPMNShape id="Gateway_1v0luv3_di" bpmnElement="Gateway_1v0luv3" isMarkerVisible="true">
-        <dc:Bounds x="3725" y="325" width="50" height="50" />
-        <bpmndi:BPMNLabel>
-          <dc:Bounds x="3771" y="363" width="78" height="14" />
-        </bpmndi:BPMNLabel>
-      </bpmndi:BPMNShape>
-      <bpmndi:BPMNShape id="Activity_0b2122w_di" bpmnElement="Activity_0b2122w">
-        <dc:Bounds x="3520" y="440" width="100" height="80" />
-        <bpmndi:BPMNLabel />
-      </bpmndi:BPMNShape>
-      <bpmndi:BPMNShape id="Gateway_1yjfdq7_di" bpmnElement="Gateway_1yjfdq7" isMarkerVisible="true">
-        <dc:Bounds x="3715" y="455" width="50" height="50" />
-        <bpmndi:BPMNLabel>
-          <dc:Bounds x="3750" y="503" width="59" height="14" />
-        </bpmndi:BPMNLabel>
-      </bpmndi:BPMNShape>
-      <bpmndi:BPMNShape id="Activity_0s8bvg3_di" bpmnElement="Activity_0s8bvg3">
-        <dc:Bounds x="4110" y="440" width="100" height="80" />
-        <bpmndi:BPMNLabel />
-      </bpmndi:BPMNShape>
-      <bpmndi:BPMNShape id="Gateway_0pspq9w_di" bpmnElement="Gateway_0pspq9w" isMarkerVisible="true">
-        <dc:Bounds x="4135" y="665" width="50" height="50" />
-      </bpmndi:BPMNShape>
-      <bpmndi:BPMNShape id="Gateway_18hezfj_di" bpmnElement="Gateway_18hezfj" isMarkerVisible="true">
-        <dc:Bounds x="3885" y="455" width="50" height="50" />
-        <bpmndi:BPMNLabel>
-          <dc:Bounds x="3866" y="520" width="88" height="40" />
-        </bpmndi:BPMNLabel>
-      </bpmndi:BPMNShape>
-      <bpmndi:BPMNShape id="Activity_0ghqjjd_di" bpmnElement="Activity_0ghqjjd">
-        <dc:Bounds x="4490" y="650" width="100" height="80" />
-        <bpmndi:BPMNLabel />
-      </bpmndi:BPMNShape>
-      <bpmndi:BPMNShape id="Event_1ldygii_di" bpmnElement="Event_1ldygii">
-        <dc:Bounds x="4822" y="672" width="36" height="36" />
-        <bpmndi:BPMNLabel>
-          <dc:Bounds x="4813" y="715" width="54" height="27" />
-        </bpmndi:BPMNLabel>
-      </bpmndi:BPMNShape>
-      <bpmndi:BPMNShape id="Event_1u087rc_di" bpmnElement="Event_1u087rc">
-        <dc:Bounds x="1502" y="212" width="36" height="36" />
-      </bpmndi:BPMNShape>
-      <bpmndi:BPMNShape id="Event_12aew91_di" bpmnElement="Event_12aew91">
-        <dc:Bounds x="2372" y="212" width="36" height="36" />
-      </bpmndi:BPMNShape>
-      <bpmndi:BPMNShape id="Event_0kjml2y_di" bpmnElement="Event_0kjml2y">
-        <dc:Bounds x="532" y="212" width="36" height="36" />
-      </bpmndi:BPMNShape>
-      <bpmndi:BPMNShape id="Event_0fk8tvj_di" bpmnElement="Event_0fk8tvj">
-        <dc:Bounds x="3352" y="212" width="36" height="36" />
-      </bpmndi:BPMNShape>
-      <bpmndi:BPMNShape id="Event_0djuzdn_di" bpmnElement="Event_0djuzdn">
-        <dc:Bounds x="3412" y="212" width="36" height="36" />
-      </bpmndi:BPMNShape>
-      <bpmndi:BPMNEdge id="Flow_1aveltz_di" bpmnElement="Flow_1aveltz">
-        <di:waypoint x="218" y="190" />
-        <di:waypoint x="275" y="190" />
-      </bpmndi:BPMNEdge>
-      <bpmndi:BPMNEdge id="Flow_0l7ypxv_di" bpmnElement="Flow_0l7ypxv">
-        <di:waypoint x="325" y="190" />
-        <di:waypoint x="500" y="190" />
-        <bpmndi:BPMNLabel>
-          <dc:Bounds x="397" y="172" width="32" height="14" />
-        </bpmndi:BPMNLabel>
-      </bpmndi:BPMNEdge>
-      <bpmndi:BPMNEdge id="Flow_06blbgp_di" bpmnElement="Flow_06blbgp">
-        <di:waypoint x="300" y="215" />
-        <di:waypoint x="300" y="410" />
-        <di:waypoint x="640" y="410" />
-        <di:waypoint x="640" y="395" />
-        <bpmndi:BPMNLabel>
-          <dc:Bounds x="272" y="310.5" width="86" height="14" />
-        </bpmndi:BPMNLabel>
-      </bpmndi:BPMNEdge>
-      <bpmndi:BPMNEdge id="Flow_1984nvi_di" bpmnElement="Flow_1984nvi">
-        <di:waypoint x="600" y="190" />
-        <di:waypoint x="745" y="190" />
-      </bpmndi:BPMNEdge>
-      <bpmndi:BPMNEdge id="Flow_1e4ljdw_di" bpmnElement="Flow_1e4ljdw">
-        <di:waypoint x="550" y="248" />
-        <di:waypoint x="550" y="370" />
-        <di:waypoint x="615" y="370" />
-        <bpmndi:BPMNLabel>
-          <dc:Bounds x="556" y="293" width="68" height="14" />
-        </bpmndi:BPMNLabel>
-      </bpmndi:BPMNEdge>
-      <bpmndi:BPMNEdge id="Flow_1g7lzbc_di" bpmnElement="Flow_1g7lzbc">
-        <di:waypoint x="665" y="370" />
-        <di:waypoint x="720" y="370" />
-      </bpmndi:BPMNEdge>
-      <bpmndi:BPMNEdge id="Flow_1s3dmbp_di" bpmnElement="Flow_1s3dmbp">
-        <di:waypoint x="770" y="330" />
-        <di:waypoint x="770" y="215" />
-      </bpmndi:BPMNEdge>
-      <bpmndi:BPMNEdge id="Flow_0776eps_di" bpmnElement="Flow_0776eps">
-        <di:waypoint x="795" y="190" />
-        <di:waypoint x="945" y="190" />
-      </bpmndi:BPMNEdge>
-      <bpmndi:BPMNEdge id="Flow_0j8b15i_di" bpmnElement="Flow_0j8b15i">
-        <di:waypoint x="995" y="190" />
-        <di:waypoint x="1190" y="190" />
-        <bpmndi:BPMNLabel>
-          <dc:Bounds x="1084" y="172" width="18" height="14" />
-        </bpmndi:BPMNLabel>
-      </bpmndi:BPMNEdge>
-      <bpmndi:BPMNEdge id="Flow_1iq0x1h_di" bpmnElement="Flow_1iq0x1h">
-        <di:waypoint x="1290" y="190" />
-        <di:waypoint x="1480" y="190" />
-      </bpmndi:BPMNEdge>
-      <bpmndi:BPMNEdge id="Flow_0l3aixg_di" bpmnElement="Flow_0l3aixg">
-        <di:waypoint x="1580" y="190" />
-        <di:waypoint x="1695" y="190" />
-      </bpmndi:BPMNEdge>
-      <bpmndi:BPMNEdge id="Flow_173ucj8_di" bpmnElement="Flow_173ucj8">
-        <di:waypoint x="1520" y="248" />
-        <di:waypoint x="1520" y="350" />
-        <di:waypoint x="1670" y="350" />
-        <bpmndi:BPMNLabel>
-          <dc:Bounds x="1538" y="293" width="43" height="14" />
-        </bpmndi:BPMNLabel>
-      </bpmndi:BPMNEdge>
-      <bpmndi:BPMNEdge id="Flow_0didc3y_di" bpmnElement="Flow_0didc3y">
-        <di:waypoint x="1720" y="310" />
-        <di:waypoint x="1720" y="215" />
-      </bpmndi:BPMNEdge>
-      <bpmndi:BPMNEdge id="Flow_17rq1hd_di" bpmnElement="Flow_17rq1hd">
-        <di:waypoint x="1745" y="190" />
-        <di:waypoint x="1880" y="190" />
-      </bpmndi:BPMNEdge>
-      <bpmndi:BPMNEdge id="Flow_05mx8se_di" bpmnElement="Flow_05mx8se">
-        <di:waypoint x="1980" y="190" />
-        <di:waypoint x="2125" y="190" />
-      </bpmndi:BPMNEdge>
-      <bpmndi:BPMNEdge id="Flow_1wtojy3_di" bpmnElement="Flow_1wtojy3">
-        <di:waypoint x="2175" y="190" />
-        <di:waypoint x="2350" y="190" />
-        <bpmndi:BPMNLabel>
-          <dc:Bounds x="2238" y="172" width="49" height="14" />
-        </bpmndi:BPMNLabel>
-      </bpmndi:BPMNEdge>
-      <bpmndi:BPMNEdge id="Flow_1py4sup_di" bpmnElement="Flow_1py4sup">
-        <di:waypoint x="2150" y="165" />
-        <di:waypoint x="2150" y="80" />
-        <di:waypoint x="2750" y="80" />
-        <di:waypoint x="2750" y="165" />
-        <bpmndi:BPMNLabel>
-          <dc:Bounds x="2407" y="46" width="65" height="27" />
-        </bpmndi:BPMNLabel>
-      </bpmndi:BPMNEdge>
-      <bpmndi:BPMNEdge id="Flow_1q53bse_di" bpmnElement="Flow_1q53bse">
-        <di:waypoint x="2450" y="190" />
-        <di:waypoint x="2555" y="190" />
-      </bpmndi:BPMNEdge>
-      <bpmndi:BPMNEdge id="Flow_0zhyovu_di" bpmnElement="Flow_0zhyovu">
-        <di:waypoint x="2605" y="190" />
-        <di:waypoint x="2725" y="190" />
-        <bpmndi:BPMNLabel>
-          <dc:Bounds x="2656" y="172" width="18" height="14" />
-        </bpmndi:BPMNLabel>
-      </bpmndi:BPMNEdge>
-      <bpmndi:BPMNEdge id="Flow_1yusbf2_di" bpmnElement="Flow_1yusbf2">
-        <di:waypoint x="2775" y="190" />
-        <di:waypoint x="2910" y="190" />
-      </bpmndi:BPMNEdge>
-      <bpmndi:BPMNEdge id="Flow_1ff6b60_di" bpmnElement="Flow_1ff6b60">
-        <di:waypoint x="3010" y="190" />
-        <di:waypoint x="3125" y="190" />
-      </bpmndi:BPMNEdge>
-      <bpmndi:BPMNEdge id="Flow_1j47y7u_di" bpmnElement="Flow_1j47y7u">
-        <di:waypoint x="3175" y="190" />
-        <di:waypoint x="3350" y="190" />
-      </bpmndi:BPMNEdge>
-      <bpmndi:BPMNEdge id="Flow_0grli2d_di" bpmnElement="Flow_0grli2d">
-        <di:waypoint x="3450" y="190" />
-        <di:waypoint x="3875" y="190" />
-      </bpmndi:BPMNEdge>
-      <bpmndi:BPMNEdge id="Flow_1lhe0ab_di" bpmnElement="Flow_1lhe0ab">
-        <di:waypoint x="3925" y="190" />
-        <di:waypoint x="4170" y="190" />
-      </bpmndi:BPMNEdge>
-      <bpmndi:BPMNEdge id="Flow_00xn00c_di" bpmnElement="Flow_00xn00c">
-        <di:waypoint x="4270" y="190" />
-        <di:waypoint x="4502" y="190" />
-      </bpmndi:BPMNEdge>
-      <bpmndi:BPMNEdge id="Flow_1f241xl_di" bpmnElement="Flow_1f241xl">
-        <di:waypoint x="4590" y="690" />
-        <di:waypoint x="4822" y="690" />
-      </bpmndi:BPMNEdge>
-      <bpmndi:BPMNEdge id="Flow_0dcwx0r_di" bpmnElement="Flow_0dcwx0r">
-        <di:waypoint x="2390" y="248" />
-        <di:waypoint x="2390" y="310" />
-      </bpmndi:BPMNEdge>
-      <bpmndi:BPMNEdge id="Flow_1kg96nf_di" bpmnElement="Flow_1kg96nf">
-        <di:waypoint x="2390" y="390" />
-        <di:waypoint x="2390" y="472" />
-      </bpmndi:BPMNEdge>
-      <bpmndi:BPMNEdge id="Flow_0oj7jg4_di" bpmnElement="Flow_0oj7jg4">
-        <di:waypoint x="2580" y="215" />
-        <di:waypoint x="2580" y="690" />
-        <di:waypoint x="4135" y="690" />
-        <bpmndi:BPMNLabel>
-          <dc:Bounds x="2589" y="378.5" width="13" height="14" />
-        </bpmndi:BPMNLabel>
-      </bpmndi:BPMNEdge>
-      <bpmndi:BPMNEdge id="Flow_0931ync_di" bpmnElement="Flow_0931ync">
-        <di:waypoint x="3430" y="248" />
-        <di:waypoint x="3430" y="350" />
-        <di:waypoint x="3520" y="350" />
-      </bpmndi:BPMNEdge>
-      <bpmndi:BPMNEdge id="Flow_1r40lm3_di" bpmnElement="Flow_1r40lm3">
-        <di:waypoint x="3620" y="350" />
-        <di:waypoint x="3725" y="350" />
-      </bpmndi:BPMNEdge>
-      <bpmndi:BPMNEdge id="Flow_0pvelee_di" bpmnElement="Flow_0pvelee">
-        <di:waypoint x="3775" y="350" />
-        <di:waypoint x="3900" y="350" />
-        <di:waypoint x="3900" y="215" />
-        <bpmndi:BPMNLabel>
-          <dc:Bounds x="3829" y="332" width="18" height="14" />
-        </bpmndi:BPMNLabel>
-      </bpmndi:BPMNEdge>
-      <bpmndi:BPMNEdge id="Flow_1rloyd8_di" bpmnElement="Flow_1rloyd8">
-        <di:waypoint x="3750" y="375" />
-        <di:waypoint x="3750" y="420" />
-        <di:waypoint x="3160" y="420" />
-        <di:waypoint x="3160" y="205" />
-        <bpmndi:BPMNLabel>
-          <dc:Bounds x="3434" y="402" width="43" height="14" />
-        </bpmndi:BPMNLabel>
-      </bpmndi:BPMNEdge>
-      <bpmndi:BPMNEdge id="Flow_0pv1uf0_di" bpmnElement="Flow_0pv1uf0">
-        <di:waypoint x="3620" y="480" />
-        <di:waypoint x="3715" y="480" />
-      </bpmndi:BPMNEdge>
-      <bpmndi:BPMNEdge id="Flow_0e09sol_di" bpmnElement="Flow_0e09sol">
-        <di:waypoint x="3765" y="480" />
-        <di:waypoint x="3885" y="480" />
-        <bpmndi:BPMNLabel>
-          <dc:Bounds x="3778" y="462" width="63" height="14" />
-        </bpmndi:BPMNLabel>
-      </bpmndi:BPMNEdge>
-      <bpmndi:BPMNEdge id="Flow_00lekjr_di" bpmnElement="Flow_00lekjr">
-        <di:waypoint x="3740" y="505" />
-        <di:waypoint x="3740" y="540" />
-        <di:waypoint x="3140" y="540" />
-        <di:waypoint x="3140" y="205" />
-        <bpmndi:BPMNLabel>
-          <dc:Bounds x="3446" y="546" width="68" height="27" />
-        </bpmndi:BPMNLabel>
-      </bpmndi:BPMNEdge>
-      <bpmndi:BPMNEdge id="Flow_15kgtmx_di" bpmnElement="Flow_15kgtmx">
-        <di:waypoint x="3370" y="248" />
-        <di:waypoint x="3370" y="480" />
-        <di:waypoint x="3520" y="480" />
-        <bpmndi:BPMNLabel>
-          <dc:Bounds x="3279" y="276" width="82" height="27" />
-        </bpmndi:BPMNLabel>
-      </bpmndi:BPMNEdge>
-      <bpmndi:BPMNEdge id="Flow_113usls_di" bpmnElement="Flow_113usls">
-        <di:waypoint x="3935" y="480" />
-        <di:waypoint x="4110" y="480" />
-        <bpmndi:BPMNLabel>
-          <dc:Bounds x="4014" y="462" width="18" height="14" />
-        </bpmndi:BPMNLabel>
-      </bpmndi:BPMNEdge>
-      <bpmndi:BPMNEdge id="Flow_18jjgvb_di" bpmnElement="Flow_18jjgvb">
-        <di:waypoint x="4185" y="690" />
-        <di:waypoint x="4490" y="690" />
-      </bpmndi:BPMNEdge>
-      <bpmndi:BPMNEdge id="Flow_00iv9zw_di" bpmnElement="Flow_00iv9zw">
-        <di:waypoint x="4160" y="520" />
-        <di:waypoint x="4160" y="665" />
-      </bpmndi:BPMNEdge>
-      <bpmndi:BPMNEdge id="Flow_1o6o7ja_di" bpmnElement="Flow_1o6o7ja">
-        <di:waypoint x="970" y="215" />
-        <di:waypoint x="970" y="690" />
-        <di:waypoint x="4135" y="690" />
-        <bpmndi:BPMNLabel>
-          <dc:Bounds x="978" y="449.5" width="15" height="14" />
-        </bpmndi:BPMNLabel>
-      </bpmndi:BPMNEdge>
-      <bpmndi:BPMNEdge id="Flow_0yqlvj9_di" bpmnElement="Flow_0yqlvj9">
-        <di:waypoint x="3910" y="505" />
-        <di:waypoint x="3910" y="690" />
-        <di:waypoint x="4135" y="690" />
-        <bpmndi:BPMNLabel>
-          <dc:Bounds x="3911" y="612.5" width="58" height="40" />
-        </bpmndi:BPMNLabel>
-      </bpmndi:BPMNEdge>
+    <bpmndi:BPMNPlane id="BPMNPlane_1" bpmnElement="sme-onboarding">
+      <bpmndi:BPMNShape id="StartEvent_ApplicationSubmitted_di" bpmnElement="StartEvent_ApplicationSubmitted"><dc:Bounds x="82" y="102" width="36" height="36" /><bpmndi:BPMNLabel><dc:Bounds x="55" y="143" width="90" height="27" /></bpmndi:BPMNLabel></bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Gateway_Country_di" bpmnElement="Gateway_Country" isMarkerVisible="true"><dc:Bounds x="175" y="95" width="50" height="50" /><bpmndi:BPMNLabel><dc:Bounds x="155" y="150" width="90" height="27" /></bpmndi:BPMNLabel></bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Task_RegistryLookup_di" bpmnElement="Task_RegistryLookup"><dc:Bounds x="270" y="80" width="100" height="80" /></bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Gateway_JoinManualCheck_di" bpmnElement="Gateway_JoinManualCheck" isMarkerVisible="true"><dc:Bounds x="395" y="235" width="50" height="50" /></bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Task_ManualRegistryCheck_di" bpmnElement="Task_ManualRegistryCheck"><dc:Bounds x="490" y="220" width="100" height="80" /></bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Gateway_JoinRegistry_di" bpmnElement="Gateway_JoinRegistry" isMarkerVisible="true"><dc:Bounds x="635" y="95" width="50" height="50" /></bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Gateway_RegistryVerified_di" bpmnElement="Gateway_RegistryVerified" isMarkerVisible="true"><dc:Bounds x="735" y="95" width="50" height="50" /><bpmndi:BPMNLabel><dc:Bounds x="715" y="150" width="90" height="27" /></bpmndi:BPMNLabel></bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Task_RequestScreening_di" bpmnElement="Task_RequestScreening"><dc:Bounds x="830" y="80" width="100" height="80" /></bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Task_AwaitScreening_di" bpmnElement="Task_AwaitScreening"><dc:Bounds x="980" y="80" width="100" height="80" /></bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Task_ChaseScreening_di" bpmnElement="Task_ChaseScreening"><dc:Bounds x="1080" y="220" width="100" height="80" /></bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Gateway_JoinScreening_di" bpmnElement="Gateway_JoinScreening" isMarkerVisible="true"><dc:Bounds x="1225" y="95" width="50" height="50" /></bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Task_DueDiligence_di" bpmnElement="Task_DueDiligence"><dc:Bounds x="1320" y="80" width="100" height="80" /></bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Gateway_Enhanced_di" bpmnElement="Gateway_Enhanced" isMarkerVisible="true"><dc:Bounds x="1465" y="95" width="50" height="50" /><bpmndi:BPMNLabel><dc:Bounds x="1445" y="150" width="90" height="27" /></bpmndi:BPMNLabel></bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Task_ComplianceReview_di" bpmnElement="Task_ComplianceReview"><dc:Bounds x="1570" y="80" width="100" height="80" /></bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Task_EscalateToHead_di" bpmnElement="Task_EscalateToHead"><dc:Bounds x="1570" y="220" width="100" height="80" /></bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="End_Escalated_di" bpmnElement="End_Escalated"><dc:Bounds x="1602" y="382" width="36" height="36" /><bpmndi:BPMNLabel><dc:Bounds x="1575" y="423" width="90" height="27" /></bpmndi:BPMNLabel></bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Gateway_Approved_di" bpmnElement="Gateway_Approved" isMarkerVisible="true"><dc:Bounds x="1735" y="95" width="50" height="50" /><bpmndi:BPMNLabel><dc:Bounds x="1715" y="150" width="90" height="27" /></bpmndi:BPMNLabel></bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Gateway_JoinToCore_di" bpmnElement="Gateway_JoinToCore" isMarkerVisible="true"><dc:Bounds x="1855" y="95" width="50" height="50" /></bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Task_CreateCustomer_di" bpmnElement="Task_CreateCustomer"><dc:Bounds x="1950" y="80" width="100" height="80" /></bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Gateway_JoinAccount_di" bpmnElement="Gateway_JoinAccount" isMarkerVisible="true"><dc:Bounds x="2095" y="95" width="50" height="50" /></bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Task_CreateAccount_di" bpmnElement="Task_CreateAccount"><dc:Bounds x="2200" y="80" width="100" height="80" /></bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Task_VerifyAccount_di" bpmnElement="Task_VerifyAccount"><dc:Bounds x="2350" y="220" width="100" height="80" /></bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Gateway_AccountFound_di" bpmnElement="Gateway_AccountFound" isMarkerVisible="true"><dc:Bounds x="2505" y="235" width="50" height="50" /><bpmndi:BPMNLabel><dc:Bounds x="2485" y="290" width="90" height="27" /></bpmndi:BPMNLabel></bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Task_ResolveAccountValidation_di" bpmnElement="Task_ResolveAccountValidation"><dc:Bounds x="2350" y="360" width="100" height="80" /></bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Gateway_Resolution_di" bpmnElement="Gateway_Resolution" isMarkerVisible="true"><dc:Bounds x="2505" y="375" width="50" height="50" /><bpmndi:BPMNLabel><dc:Bounds x="2485" y="430" width="90" height="27" /></bpmndi:BPMNLabel></bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Gateway_CustomerOurs_di" bpmnElement="Gateway_CustomerOurs" isMarkerVisible="true"><dc:Bounds x="2635" y="375" width="50" height="50" /><bpmndi:BPMNLabel><dc:Bounds x="2615" y="430" width="90" height="27" /></bpmndi:BPMNLabel></bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Task_CloseCustomer_di" bpmnElement="Task_CloseCustomer"><dc:Bounds x="2740" y="360" width="100" height="80" /></bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Gateway_JoinWelcome_di" bpmnElement="Gateway_JoinWelcome" isMarkerVisible="true"><dc:Bounds x="2635" y="95" width="50" height="50" /></bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Task_SendWelcome_di" bpmnElement="Task_SendWelcome"><dc:Bounds x="2740" y="80" width="100" height="80" /></bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="End_AccountOpened_di" bpmnElement="End_AccountOpened"><dc:Bounds x="2902" y="102" width="36" height="36" /><bpmndi:BPMNLabel><dc:Bounds x="2875" y="143" width="90" height="27" /></bpmndi:BPMNLabel></bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Gateway_JoinRejection_di" bpmnElement="Gateway_JoinRejection" isMarkerVisible="true"><dc:Bounds x="2765" y="515" width="50" height="50" /></bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Task_SendRejection_di" bpmnElement="Task_SendRejection"><dc:Bounds x="2870" y="500" width="100" height="80" /></bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="End_Rejected_di" bpmnElement="End_Rejected"><dc:Bounds x="3042" y="522" width="36" height="36" /><bpmndi:BPMNLabel><dc:Bounds x="3015" y="563" width="90" height="27" /></bpmndi:BPMNLabel></bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Boundary_RegistryNotFound_di" bpmnElement="Boundary_RegistryNotFound"><dc:Bounds x="302" y="142" width="36" height="36" /><bpmndi:BPMNLabel><dc:Bounds x="324" y="182" width="80" height="27" /></bpmndi:BPMNLabel></bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Boundary_ScreeningOverdue_di" bpmnElement="Boundary_ScreeningOverdue"><dc:Bounds x="1012" y="142" width="36" height="36" /><bpmndi:BPMNLabel><dc:Bounds x="1034" y="182" width="80" height="27" /></bpmndi:BPMNLabel></bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Boundary_ReviewOverdue_di" bpmnElement="Boundary_ReviewOverdue"><dc:Bounds x="1602" y="142" width="36" height="36" /><bpmndi:BPMNLabel><dc:Bounds x="1624" y="182" width="80" height="27" /></bpmndi:BPMNLabel></bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Boundary_AccountValidation_di" bpmnElement="Boundary_AccountValidation"><dc:Bounds x="2197" y="142" width="36" height="36" /><bpmndi:BPMNLabel><dc:Bounds x="2140" y="182" width="72" height="27" /></bpmndi:BPMNLabel></bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Boundary_AccountUnknown_di" bpmnElement="Boundary_AccountUnknown"><dc:Bounds x="2267" y="142" width="36" height="36" /><bpmndi:BPMNLabel><dc:Bounds x="2305" y="182" width="60" height="27" /></bpmndi:BPMNLabel></bpmndi:BPMNShape>
+      <bpmndi:BPMNEdge id="Flow_ToCountry_di" bpmnElement="Flow_ToCountry"><di:waypoint x="118" y="120" /><di:waypoint x="175" y="120" /></bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_Country_KE_di" bpmnElement="Flow_Country_KE"><di:waypoint x="225" y="120" /><di:waypoint x="270" y="120" /><bpmndi:BPMNLabel><dc:Bounds x="228" y="100" width="40" height="14" /></bpmndi:BPMNLabel></bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_Country_Other_di" bpmnElement="Flow_Country_Other"><di:waypoint x="200" y="145" /><di:waypoint x="200" y="310" /><di:waypoint x="420" y="310" /><di:waypoint x="420" y="285" /><bpmndi:BPMNLabel><dc:Bounds x="230" y="314" width="90" height="27" /></bpmndi:BPMNLabel></bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_NotFoundToManual_di" bpmnElement="Flow_NotFoundToManual"><di:waypoint x="320" y="178" /><di:waypoint x="320" y="260" /><di:waypoint x="395" y="260" /></bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_ToManualCheck_di" bpmnElement="Flow_ToManualCheck"><di:waypoint x="445" y="260" /><di:waypoint x="490" y="260" /></bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_RegistryLookupDone_di" bpmnElement="Flow_RegistryLookupDone"><di:waypoint x="370" y="120" /><di:waypoint x="635" y="120" /></bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_ManualCheckDone_di" bpmnElement="Flow_ManualCheckDone"><di:waypoint x="590" y="260" /><di:waypoint x="660" y="260" /><di:waypoint x="660" y="145" /></bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_ToRegistryDecision_di" bpmnElement="Flow_ToRegistryDecision"><di:waypoint x="685" y="120" /><di:waypoint x="735" y="120" /></bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_RegistryYes_di" bpmnElement="Flow_RegistryYes"><di:waypoint x="785" y="120" /><di:waypoint x="830" y="120" /><bpmndi:BPMNLabel><dc:Bounds x="791" y="96" width="90" height="14" /></bpmndi:BPMNLabel></bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_RegistryNo_di" bpmnElement="Flow_RegistryNo"><di:waypoint x="760" y="145" /><di:waypoint x="760" y="540" /><di:waypoint x="2765" y="540" /><bpmndi:BPMNLabel><dc:Bounds x="766" y="250" width="20" height="14" /></bpmndi:BPMNLabel></bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_ToAwaitScreening_di" bpmnElement="Flow_ToAwaitScreening"><di:waypoint x="930" y="120" /><di:waypoint x="980" y="120" /></bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_ToChaseScreening_di" bpmnElement="Flow_ToChaseScreening"><di:waypoint x="1030" y="178" /><di:waypoint x="1030" y="260" /><di:waypoint x="1080" y="260" /></bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_ScreeningReceived_di" bpmnElement="Flow_ScreeningReceived"><di:waypoint x="1080" y="120" /><di:waypoint x="1225" y="120" /></bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_ChaseDone_di" bpmnElement="Flow_ChaseDone"><di:waypoint x="1180" y="260" /><di:waypoint x="1250" y="260" /><di:waypoint x="1250" y="145" /></bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_ToDueDiligence_di" bpmnElement="Flow_ToDueDiligence"><di:waypoint x="1275" y="120" /><di:waypoint x="1320" y="120" /></bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_ToEnhancedGateway_di" bpmnElement="Flow_ToEnhancedGateway"><di:waypoint x="1420" y="120" /><di:waypoint x="1465" y="120" /></bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_Enhanced_di" bpmnElement="Flow_Enhanced"><di:waypoint x="1515" y="120" /><di:waypoint x="1570" y="120" /><bpmndi:BPMNLabel><dc:Bounds x="1512" y="90" width="55" height="14" /></bpmndi:BPMNLabel></bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_NotEnhanced_di" bpmnElement="Flow_NotEnhanced"><di:waypoint x="1490" y="95" /><di:waypoint x="1490" y="40" /><di:waypoint x="1880" y="40" /><di:waypoint x="1880" y="95" /><bpmndi:BPMNLabel><dc:Bounds x="1630" y="24" width="110" height="14" /></bpmndi:BPMNLabel></bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_ToEscalate_di" bpmnElement="Flow_ToEscalate"><di:waypoint x="1620" y="178" /><di:waypoint x="1620" y="220" /></bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_EscalationDone_di" bpmnElement="Flow_EscalationDone"><di:waypoint x="1620" y="300" /><di:waypoint x="1620" y="382" /></bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_ReviewDone_di" bpmnElement="Flow_ReviewDone"><di:waypoint x="1670" y="120" /><di:waypoint x="1735" y="120" /></bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_Approved_di" bpmnElement="Flow_Approved"><di:waypoint x="1785" y="120" /><di:waypoint x="1855" y="120" /><bpmndi:BPMNLabel><dc:Bounds x="1791" y="96" width="90" height="14" /></bpmndi:BPMNLabel></bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_Rejected_di" bpmnElement="Flow_Rejected"><di:waypoint x="1760" y="145" /><di:waypoint x="1760" y="540" /><di:waypoint x="2765" y="540" /><bpmndi:BPMNLabel><dc:Bounds x="1766" y="200" width="20" height="14" /></bpmndi:BPMNLabel></bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_ToCreateCustomer_di" bpmnElement="Flow_ToCreateCustomer"><di:waypoint x="1905" y="120" /><di:waypoint x="1950" y="120" /></bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_ToCreateAccount_di" bpmnElement="Flow_ToCreateAccount"><di:waypoint x="2050" y="120" /><di:waypoint x="2095" y="120" /></bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_ToAccountTask_di" bpmnElement="Flow_ToAccountTask"><di:waypoint x="2145" y="120" /><di:waypoint x="2200" y="120" /></bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_ToVerifyAccount_di" bpmnElement="Flow_ToVerifyAccount"><di:waypoint x="2285" y="178" /><di:waypoint x="2285" y="260" /><di:waypoint x="2350" y="260" /></bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_ToResolveValidation_di" bpmnElement="Flow_ToResolveValidation"><di:waypoint x="2215" y="178" /><di:waypoint x="2215" y="400" /><di:waypoint x="2350" y="400" /></bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_VerifyDone_di" bpmnElement="Flow_VerifyDone"><di:waypoint x="2450" y="260" /><di:waypoint x="2505" y="260" /></bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_AccountFound_di" bpmnElement="Flow_AccountFound"><di:waypoint x="2555" y="260" /><di:waypoint x="2660" y="260" /><di:waypoint x="2660" y="145" /><bpmndi:BPMNLabel><dc:Bounds x="2561" y="236" width="90" height="14" /></bpmndi:BPMNLabel></bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_AccountNotCreated_di" bpmnElement="Flow_AccountNotCreated"><di:waypoint x="2530" y="285" /><di:waypoint x="2530" y="330" /><di:waypoint x="2132" y="330" /><di:waypoint x="2132" y="133" /><bpmndi:BPMNLabel><dc:Bounds x="2400" y="336" width="60" height="14" /></bpmndi:BPMNLabel></bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_ResolutionDone_di" bpmnElement="Flow_ResolutionDone"><di:waypoint x="2450" y="400" /><di:waypoint x="2505" y="400" /></bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_RetryAccount_di" bpmnElement="Flow_RetryAccount"><di:waypoint x="2530" y="425" /><di:waypoint x="2530" y="470" /><di:waypoint x="2108" y="470" /><di:waypoint x="2108" y="133" /><bpmndi:BPMNLabel><dc:Bounds x="2300" y="474" width="90" height="14" /></bpmndi:BPMNLabel></bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_CloseCustomer_di" bpmnElement="Flow_CloseCustomer"><di:waypoint x="2555" y="400" /><di:waypoint x="2635" y="400" /><bpmndi:BPMNLabel><dc:Bounds x="2560" y="370" width="50" height="27" /></bpmndi:BPMNLabel></bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_CustomerOursYes_di" bpmnElement="Flow_CustomerOursYes"><di:waypoint x="2685" y="400" /><di:waypoint x="2740" y="400" /><bpmndi:BPMNLabel><dc:Bounds x="2690" y="384" width="25" height="14" /></bpmndi:BPMNLabel></bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_CustomerOursNo_di" bpmnElement="Flow_CustomerOursNo"><di:waypoint x="2660" y="425" /><di:waypoint x="2660" y="540" /><di:waypoint x="2765" y="540" /><bpmndi:BPMNLabel><dc:Bounds x="2666" y="470" width="80" height="27" /></bpmndi:BPMNLabel></bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_ClosedToRejection_di" bpmnElement="Flow_ClosedToRejection"><di:waypoint x="2790" y="440" /><di:waypoint x="2790" y="515" /></bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_ToJoinWelcome_di" bpmnElement="Flow_ToJoinWelcome"><di:waypoint x="2300" y="120" /><di:waypoint x="2635" y="120" /></bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_ToWelcome_di" bpmnElement="Flow_ToWelcome"><di:waypoint x="2685" y="120" /><di:waypoint x="2740" y="120" /></bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_ToEndOpened_di" bpmnElement="Flow_ToEndOpened"><di:waypoint x="2840" y="120" /><di:waypoint x="2902" y="120" /></bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_ToSendRejection_di" bpmnElement="Flow_ToSendRejection"><di:waypoint x="2815" y="540" /><di:waypoint x="2870" y="540" /></bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_ToEndRejected_di" bpmnElement="Flow_ToEndRejected"><di:waypoint x="2970" y="540" /><di:waypoint x="3042" y="540" /></bpmndi:BPMNEdge>
     </bpmndi:BPMNPlane>
   </bpmndi:BPMNDiagram>
 </bpmn:definitions>

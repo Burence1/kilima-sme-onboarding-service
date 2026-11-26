@@ -1,0 +1,41 @@
+{
+  "executionPlatform": "Camunda Cloud",
+  "executionPlatformVersion": "8.9.0",
+  "exporter": {
+    "name": "Camunda Modeler",
+    "version": "5.40.0"
+  },
+  "schemaVersion": 18,
+  "id": "chase-screening",
+  "type": "default",
+  "components": [
+    {
+      "type": "text",
+      "text": "## Screening result overdue\nNo result after 26 hours. Contact the screening provider and record the result.",
+      "id": "chase_screening_text_0"
+    },
+    {
+      "type": "textfield",
+      "key": "screeningRequestId",
+      "label": "Screening request ID",
+      "readonly": true,
+      "id": "chase_screening_screeningRequestId_1"
+    },
+    {
+      "type": "checkbox",
+      "key": "screeningMatch",
+      "label": "Possible sanctions or PEP match",
+      "id": "chase_screening_screeningMatch",
+      "defaultValue": false
+    },
+    {
+      "type": "textfield",
+      "key": "screeningReference",
+      "label": "Provider reference",
+      "validate": {
+        "required": true
+      },
+      "id": "chase_screening_screeningReference_3"
+    }
+  ]
+}
