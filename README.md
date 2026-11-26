@@ -93,3 +93,28 @@ Camunda 8 Run with `camunda.process-test.runtime-mode=remote` (the clock must be
 | Customer 422, 401 or anything unexpected | Incident in Operate | - |
 
 Core banking tasks have 10 retries. When they run out, Camunda raises an incident.
+
+## Assumptions
+
+* `GET /customers?registrationNumber=` returns the customer or 404.
+* Core banking stores an external reference on the customer. I send `applicationId`, so I can tell a customer from an earlier attempt apart from an existing bank customer.
+* There's no API to close a customer, so it's a manual task.
+* The screening service calls back with `applicationId`, a request ID, the match flag and a reference.
+* The core banking limit of 20 calls a minute is ours alone: no other bank systems use the same allowance.
+
+## Questions for the client
+
+1. Only customers have a lookup. After a timeout on `POST /accounts`, is there any way to find out whether the account was created, for example by listing a customer's accounts? Without it, a person has to check core banking by hand.
+2. Do other bank systems call core banking under the same 20 calls a minute limit? If so, how much of it can this service use?
+3. How is a customer closed in core banking, and who is allowed to do it?
+4. The screening callback endpoint has no authentication in this demo. Can the provider sign its callbacks (HMAC) or use mTLS, so the service only accepts genuine results?
+
+## Use of AI tools
+
+I used an AI assistant as a pair programmer to generate an initial version of the process model, workers, and tests, and to help draft parts of this README.
+
+I treated that output as a starting point, not a finished solution. I set up the service, modelled the process in Camunda Modeler, worked on the DMN decision table and forms, and rebuilt the solution within this repository.
+
+I deployed and tested the different process paths against Camunda 8 Run, validating their execution in Operate and Tasklist. During testing, I identified a duplicate-submission scenario where the same application could result in two accounts being opened. This prompted me to rethink the process initiation and introduce application-ID-based message correlation.
+
+I take ownership of the final implementation and design decisions, and I can explain, validate, and modify any part of the code, process models, or configuration.
