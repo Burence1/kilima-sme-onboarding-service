@@ -26,18 +26,15 @@ public class CoreBankingClient {
   private final RestClient restClient;
 
   public CoreBankingClient(CoreBankingProperties properties) {
-    HttpClient httpClient =
-        HttpClient.newBuilder().connectTimeout(properties.connectTimeout()).build();
+    HttpClient httpClient = HttpClient.newBuilder().connectTimeout(properties.connectTimeout()).build();
     JdkClientHttpRequestFactory requestFactory = new JdkClientHttpRequestFactory(httpClient);
     requestFactory.setReadTimeout(properties.readTimeout());
-    this.restClient =
-        RestClient.builder().baseUrl(properties.baseUrl()).requestFactory(requestFactory).build();
+    this.restClient = RestClient.builder().baseUrl(properties.baseUrl()).requestFactory(requestFactory).build();
   }
 
   public Optional<Customer> findCustomer(String registrationNumber) {
     return send("GET /customers", true,
-        () ->
-            restClient
+        () -> restClient
                 .get()
                 .uri(b -> b.path("/customers").queryParam("registrationNumber", registrationNumber).build())
                 .exchange(
@@ -57,8 +54,7 @@ public class CoreBankingClient {
     return send(
         "POST /customers",
         false,
-        () ->
-            restClient
+        () -> restClient
                 .post()
                 .uri("/customers")
                 .body(body)
@@ -73,11 +69,8 @@ public class CoreBankingClient {
   }
 
   public Account createAccount(CreateAccountRequest body) {
-    return send(
-        "POST /accounts",
-        false,
-        () ->
-            restClient
+    return send("POST /accounts", false,
+        () -> restClient
                 .post()
                 .uri("/accounts")
                 .body(body)
