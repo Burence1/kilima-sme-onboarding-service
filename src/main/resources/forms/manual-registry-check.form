@@ -1,0 +1,39 @@
+{
+  "executionPlatform": "Camunda Cloud",
+  "executionPlatformVersion": "8.9.0",
+  "exporter": {
+    "name": "Camunda Modeler",
+    "version": "5.40.0"
+  },
+  "schemaVersion": 18,
+  "id": "manual-registry-check",
+  "type": "default",
+  "components": [
+    {
+      "type": "text",
+      "text": "## Check the business registry\nLook the business up in the national registry and confirm it is active.",
+      "id": "manual_registry_check_text_0"
+    },
+    {
+      "type": "textfield",
+      "key": "registrationNumber",
+      "label": "Registration number",
+      "readonly": true,
+      "id": "manual_registry_check_registrationNumber_1"
+    },
+    {
+      "type": "textfield",
+      "key": "businessName",
+      "label": "Business name",
+      "readonly": true,
+      "id": "manual_registry_check_businessName_2"
+    },
+    {
+      "type": "checkbox",
+      "key": "registryVerified",
+      "label": "Business found in the registry and active",
+      "id": "manual_registry_check_registryVerified",
+      "defaultValue": false
+    }
+  ]
+}

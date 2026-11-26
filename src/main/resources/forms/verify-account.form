@@ -1,0 +1,31 @@
+{
+  "executionPlatform": "Camunda Cloud",
+  "executionPlatformVersion": "8.9.0",
+  "exporter": {
+    "name": "Camunda Modeler",
+    "version": "5.40.0"
+  },
+  "schemaVersion": 18,
+  "id": "verify-account",
+  "type": "default",
+  "components": [
+    {
+      "type": "text",
+      "text": "## Did core banking create the account?\nThe account request timed out. Check core banking for an account for this customer. Leave the account number empty if none exists; the process will retry.",
+      "id": "verify_account_text_0"
+    },
+    {
+      "type": "textfield",
+      "key": "customerId",
+      "label": "Customer ID",
+      "readonly": true,
+      "id": "verify_account_customerId_1"
+    },
+    {
+      "type": "textfield",
+      "key": "accountNumber",
+      "label": "Account number (if it exists)",
+      "id": "verify_account_accountNumber_2"
+    }
+  ]
+}

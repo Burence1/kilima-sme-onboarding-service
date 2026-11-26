@@ -1,0 +1,51 @@
+{
+  "executionPlatform": "Camunda Cloud",
+  "executionPlatformVersion": "8.9.0",
+  "exporter": {
+    "name": "Camunda Modeler",
+    "version": "5.40.0"
+  },
+  "schemaVersion": 18,
+  "id": "resolve-rejected-account",
+  "type": "default",
+  "components": [
+    {
+      "type": "text",
+      "text": "## Core banking rejected the account\nThe customer record already exists. Fix the data and retry, or close the customer.",
+      "id": "resolve_rejected_account_text_0"
+    },
+    {
+      "type": "textfield",
+      "key": "customerId",
+      "label": "Customer ID",
+      "readonly": true,
+      "id": "resolve_rejected_account_customerId_1"
+    },
+    {
+      "type": "textfield",
+      "key": "accountValidationError",
+      "label": "Core banking error",
+      "readonly": true,
+      "id": "resolve_rejected_account_accountValidationError_2"
+    },
+    {
+      "type": "radio",
+      "key": "accountResolution",
+      "label": "Resolution",
+      "values": [
+        {
+          "label": "Data fixed, retry account creation",
+          "value": "RETRY"
+        },
+        {
+          "label": "Cannot open, close the customer",
+          "value": "CLOSE_CUSTOMER"
+        }
+      ],
+      "validate": {
+        "required": true
+      },
+      "id": "resolve_rejected_account_accountResolution_3"
+    }
+  ]
+}

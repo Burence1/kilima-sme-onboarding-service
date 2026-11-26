@@ -1,0 +1,51 @@
+{
+  "executionPlatform": "Camunda Cloud",
+  "executionPlatformVersion": "8.9.0",
+  "exporter": {
+    "name": "Camunda Modeler",
+    "version": "5.40.0"
+  },
+  "schemaVersion": 18,
+  "id": "compliance-review",
+  "type": "default",
+  "components": [
+    {
+      "type": "text",
+      "text": "## Enhanced due diligence review\nReview the application and screening result in the case file.",
+      "id": "compliance_review_text_0"
+    },
+    {
+      "type": "textfield",
+      "key": "applicationId",
+      "label": "Application ID",
+      "readonly": true,
+      "id": "compliance_review_applicationId_1"
+    },
+    {
+      "type": "textfield",
+      "key": "screeningReference",
+      "label": "Screening reference",
+      "readonly": true,
+      "id": "compliance_review_screeningReference_2"
+    },
+    {
+      "type": "radio",
+      "key": "complianceDecision",
+      "label": "Decision",
+      "values": [
+        {
+          "label": "Approve",
+          "value": "APPROVED"
+        },
+        {
+          "label": "Reject",
+          "value": "REJECTED"
+        }
+      ],
+      "validate": {
+        "required": true
+      },
+      "id": "compliance_review_complianceDecision_3"
+    }
+  ]
+}
