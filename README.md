@@ -34,16 +34,16 @@ the wrapper (`./mvnw`, or `mvnw.cmd` on Windows).
 # 3. Start applications
 scripts/start-application.sh APP-1001 KE                      # happy path
 scripts/start-application.sh APP-MATCH-1002 KE                # screening match -> compliance review
-scripts/start-application.sh APP-1003 TZ                      # manual registry check by branch staff
+scripts/start-application.sh APP-1003 TZ                      # manual registry check by staff
 scripts/start-application.sh APP-1004 KE PVT-ACC422-1004      # account rejected (422) -> resolve task
 scripts/start-application.sh APP-1005 KE PVT-ACCTIMEOUT-1005  # account outcome unknown -> verify task
-scripts/start-application.sh APP-1006 KE PVT-CUST422-1006     # customer rejected -> incident in Operate
+scripts/start-application.sh APP-1006 KE PVT-CUST422-1006     # customer rejected -> incident
 ```
 
 On Windows, use `scripts\start-application.cmd APP-1001 KE` (Command Prompt or Cmder) or
 `scripts\start-application.ps1 APP-1001 KE` (PowerShell) with the same arguments.
 
-Open Operate and Tasklist at http://localhost:8080 (demo / demo). The stubbed screening service calls
+Open Operate and Tasklist at http://localhost:8080  creds: (demo / demo). The stubbed screening service calls
 back after 10 seconds. To run against SaaS instead, set `camunda.client.mode=saas` and the cluster
 credentials (`camunda.client.auth.client-id`, `camunda.client.auth.client-secret`,
 `camunda.client.cloud.cluster-id`, `camunda.client.cloud.region`).
